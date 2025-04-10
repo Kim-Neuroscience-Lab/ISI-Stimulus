@@ -354,6 +354,7 @@ class SphericalCorrection:
     ) -> np.ndarray:
         """
         Create mask for the drifting bar with static checkerboard texture.
+        The bar shape is properly transformed according to spherical coordinates.
 
         Args:
             pos_deg: Position of drifting bar in visual degrees (angle in the sweep direction)
@@ -374,21 +375,94 @@ class SphericalCorrection:
         else:
             raise ValueError(f"Invalid sweep direction: {sweep_direction}")
 
-        # Get coordinate grids
-        y_grid, x_grid = self.coordinates_grid_deg
+        # Get image dimensions
+        height, width = self.parameters.get("height", 1024), self.parameters.get(
+            "width", 1280
+        )
 
-        # Create the moving bar mask
+        # Create coordinate arrays - ensure these match the actual image dimensions
+        x = np.arange(width)
+        y = np.arange(height)
+
+        # Create meshgrid
+        xx, yy = np.meshgrid(x, y)
+
+        # Normalize coordinates to range [-1, 1]
+        x_norm = 2 * (xx / max(1, width - 1)) - 1
+        y_norm = 2 * (yy / max(1, height - 1)) - 1
+
+        # Convert to visual degrees
+        x_deg = x_norm * (self.x_size / 2)
+        y_deg = y_norm * (self.y_size / 2)
+
+        # Calculate the spherical coordinates directly for all pixels
+        # First apply horizontal meridian offset to y coordinates
+        y_deg_adjusted = y_deg - self.horizontal_meridian_offset
+
+        # We need to map the degrees to actual distances
+        # Convert eye-to-screen distance to the same units
+        x0 = self.screen_distance  # Distance from eye to screen (cm)
+
+        # Convert degrees to distances on screen
+        # Using small angle approximation: tan(θ) ≈ θ (in radians)
+        # d = x0 * tan(θ)
+        azimuth_rad = np.radians(x_deg)  # Horizontal on screen (azimuth)
+        altitude_rad = np.radians(y_deg_adjusted)  # Vertical on screen (altitude)
+
+        # Convert to distances on screen (relative to center)
+        y_screen = x0 * np.tan(azimuth_rad)  # Horizontal distance on screen
+        z_screen = x0 * np.tan(altitude_rad)  # Vertical distance on screen
+
+        # Calculate the square root term
+        sqrt_term = np.sqrt(x0**2 + y_screen**2 + z_screen**2)
+
+        # Calculate altitude (θ)
+        # Handle potential division by zero or arguments outside [-1, 1]
+        z_over_sqrt = np.zeros_like(z_screen)
+        valid_indices = sqrt_term > 0
+        z_over_sqrt[valid_indices] = z_screen[valid_indices] / sqrt_term[valid_indices]
+        # Clip to handle numerical errors
+        z_over_sqrt = np.clip(z_over_sqrt, -1.0, 1.0)
+
+        # Calculate altitude using the formula θ = π/2 - cos⁻¹(z/√(x₀² + y² + z²))
+        theta = np.pi / 2 - np.arccos(z_over_sqrt)
+
+        # Calculate azimuth (φ)
+        # Handle potential division by zero
+        phi = np.zeros_like(y_screen)
+        nonzero_indices = np.abs(x0) > 1e-10
+        phi[nonzero_indices] = np.arctan2(-y_screen[nonzero_indices], x0)
+
+        # Convert back to degrees
+        theta_deg = np.degrees(theta)  # altitude angle
+        phi_deg = np.degrees(phi)  # azimuth angle
+
+        # Create the bar mask directly in spherical coordinate space
+        # This ensures the bar follows the correct spherical curvature
+        # Initialize empty mask
+        bar_mask = np.zeros((height, width), dtype=bool)
+
         if sweep_direction in ["left-to-right", "right-to-left"]:
-            # Horizontal bar (moves horizontally, fixed y position)
-            # x_grid contains azimuth angles, compare with azimuth position
-            bar_mask = (x_grid > (pos_deg - size_deg / 2)) & (
-                x_grid < (pos_deg + size_deg / 2)
+            # For horizontal sweep, define the bar as a region of constant azimuth
+            # The bar is defined by phi (azimuth) values within a range
+            mask_condition = (phi_deg > (pos_deg - size_deg / 2)) & (
+                phi_deg < (pos_deg + size_deg / 2)
             )
         else:
-            # Vertical bar (moves vertically, fixed x position)
-            # y_grid contains altitude angles, compare with altitude position
-            bar_mask = (y_grid > (pos_deg - size_deg / 2)) & (
-                y_grid < (pos_deg + size_deg / 2)
+            # For vertical sweep, define the bar as a region of constant altitude
+            # The bar is defined by theta (altitude) values within a range
+            adjusted_theta_deg = theta_deg + self.horizontal_meridian_offset
+            mask_condition = (adjusted_theta_deg > (pos_deg - size_deg / 2)) & (
+                adjusted_theta_deg < (pos_deg + size_deg / 2)
             )
+
+        # Apply the mask condition, ensuring proper dimensions
+        bar_mask = mask_condition
+
+        # Ensure mask has correct dimensions
+        assert bar_mask.shape == (
+            height,
+            width,
+        ), f"Mask shape {bar_mask.shape} doesn't match expected dimensions {(height, width)}"
 
         return bar_mask

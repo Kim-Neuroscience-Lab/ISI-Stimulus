@@ -192,9 +192,14 @@ class DriftingBarStimulus(
         self.y_size = self.parameters.get(
             "y_size", 153.0
         )  # degrees - vertical visual field
-        self.bar_width = self.parameters.get(
-            "bar_width", 20.0
-        )  # degrees - 20° wide as in MMC1
+
+        # Ensure the bar width is exactly 20 degrees as specified in MMC1
+        requested_bar_width = self.parameters.get("bar_width", 20.0)
+        if requested_bar_width != 20.0:
+            self.logger.warning(
+                f"Requested bar width of {requested_bar_width}° overridden to 20.0° as specified in MMC1"
+            )
+        self.bar_width = 20.0  # degrees - exactly 20° wide as in MMC1
 
         # Determine drift speed based on imaging mode
         self.is_two_photon = self.parameters.get("is_two_photon", False)
@@ -225,11 +230,17 @@ class DriftingBarStimulus(
         # Number of repeats per direction
         self.repeats = self.parameters.get("drift_repeats", 10)  # 10 repeats as in MMC1
 
-        # Grid spacing for checkerboard pattern
-        self.grid_spacing_x = self.parameters.get(
-            "grid_spacing_x", 25.0
-        )  # degrees - 25° squares as in MMC1
-        self.grid_spacing_y = self.parameters.get("grid_spacing_y", 25.0)  # degrees
+        # Ensure grid spacing for checkerboard pattern is exactly 25 degrees as in MMC1
+        requested_grid_x = self.parameters.get("grid_spacing_x", 25.0)
+        requested_grid_y = self.parameters.get("grid_spacing_y", 25.0)
+
+        if requested_grid_x != 25.0 or requested_grid_y != 25.0:
+            self.logger.warning(
+                f"Requested grid spacing of {requested_grid_x}°x{requested_grid_y}° overridden to 25.0°x25.0° as specified in MMC1"
+            )
+
+        self.grid_spacing_x = 25.0  # degrees - exactly 25° squares as in MMC1
+        self.grid_spacing_y = 25.0  # degrees - exactly 25° squares as in MMC1
 
         # Temporal frequency for checkerboard alternation (166ms period = ~6Hz)
         self.temporal_freq = self.parameters.get("temporal_freq", 6.0)  # Hz
@@ -284,7 +295,11 @@ class DriftingBarStimulus(
 
             # Create temporary params with correct axis
             temp_params = self.spherical_correction.parameters.copy()
+
+            # Update parameters with correct dimensions and axis
             self.spherical_correction.parameters["correct_axis"] = correct_axis
+            self.spherical_correction.parameters["width"] = self._resolution[0]
+            self.spherical_correction.parameters["height"] = self._resolution[1]
 
             # Create transformation maps
             map_x, map_y = self.spherical_correction.create_transformation_maps(
@@ -338,14 +353,15 @@ class DriftingBarStimulus(
 
     def get_frame(self, frame_idx: int) -> np.ndarray:
         """
-        Get a specific frame of the drifting bar stimulus.
+        Generate a single frame of the drifting bar stimulus.
 
         Args:
             frame_idx: Index of the frame to generate
 
         Returns:
-            np.ndarray: The stimulus frame
+            np.ndarray: Generated frame as a 2D numpy array
         """
+        # Create blank frame
         frame = np.zeros(
             (self._resolution[1], self._resolution[0]), dtype=np.uint8
         )  # Start with a blank frame
@@ -370,58 +386,91 @@ class DriftingBarStimulus(
         else:
             raise ValueError(f"Unknown sweep direction: {sweep_direction}")
 
-        # Generate raw coordinate grids - centered at (0, 0) in degree space
-        # Evenly spaced coordinates in visual degrees
-        y_degrees = np.linspace(-self.y_size / 2, self.y_size / 2, self._resolution[1])
-        x_degrees = np.linspace(-self.x_size / 2, self.x_size / 2, self._resolution[0])
+        # Set sweep direction in spherical correction parameters
+        self.spherical_correction.parameters["sweep_direction"] = sweep_direction
 
-        # Use meshgrid to create 2D coordinate grids
-        x_grid_raw, y_grid_raw = np.meshgrid(x_degrees, y_degrees)
+        # Also set correct dimensions to ensure consistent array sizes
+        self.spherical_correction.parameters["width"] = self._resolution[0]
+        self.spherical_correction.parameters["height"] = self._resolution[1]
 
-        # Create the bar mask based on the sweep direction
-        if sweep_direction in ["left-to-right", "right-to-left"]:
-            # For horizontal sweeps, use untransformed x-coordinates for the bar position
-            bar_mask = np.abs(x_grid_raw - pos) < self.bar_width / 2
-        else:
-            # For vertical sweeps, use untransformed y-coordinates for the bar position
-            bar_mask = np.abs(y_grid_raw - pos) < self.bar_width / 2
+        # Use the spherical_correction.transform_drifting_bar method to get the proper transformed bar mask
+        # This ensures the bar shape is properly transformed in spherical space
+        bar_mask = self.spherical_correction.transform_drifting_bar(
+            pos, sweep_direction, self.bar_width
+        )
 
-        # Get spherical correction parameters
-        screen_distance = self.spherical_correction.screen_distance  # cm
+        # Get indices of pixels within the transformed bar
+        bar_indices = np.where(bar_mask)
 
-        # Convert degree coordinates to screen distances
-        # d = screen_distance * tan(θ)
-        x_rad = np.radians(x_grid_raw)
-        y_rad = np.radians(y_grid_raw)
+        if len(bar_indices[0]) == 0:
+            # No pixels in the bar for this frame (could happen at the edges)
+            return frame
 
-        # Get positions on screen (relative to straight-ahead point)
-        y_screen = screen_distance * np.tan(x_rad)  # Horizontal position
-        z_screen = screen_distance * np.tan(y_rad)  # Vertical position
-        x0 = screen_distance  # Distance from eye to screen
+        # Generate full spherical coordinates for all pixels
+        height, width = self._resolution[1], self._resolution[0]
 
-        # Calculate sqrt term
+        # Create coordinate arrays
+        x = np.arange(width)
+        y = np.arange(height)
+
+        # Create meshgrid
+        xx, yy = np.meshgrid(x, y)
+
+        # Normalize coordinates to range [-1, 1]
+        x_norm = 2 * (xx / (width - 1)) - 1
+        y_norm = 2 * (yy / (height - 1)) - 1
+
+        # Convert to visual degrees
+        x_deg = x_norm * (self.x_size / 2)
+        y_deg = y_norm * (self.y_size / 2)
+
+        # Calculate the full spherical coordinates directly
+
+        # First apply horizontal meridian offset to y coordinates
+        y_deg_adjusted = y_deg - self.spherical_correction.horizontal_meridian_offset
+
+        # Get distance to screen
+        x0 = (
+            self.spherical_correction.screen_distance
+        )  # Distance from eye to screen (cm)
+
+        # Convert degrees to distances on screen
+        azimuth_rad = np.radians(x_deg)  # Horizontal on screen (azimuth)
+        altitude_rad = np.radians(y_deg_adjusted)  # Vertical on screen (altitude)
+
+        # Convert to distances on screen (relative to center)
+        y_screen = x0 * np.tan(azimuth_rad)  # Horizontal distance on screen
+        z_screen = x0 * np.tan(altitude_rad)  # Vertical distance on screen
+
+        # Calculate the square root term
         sqrt_term = np.sqrt(x0**2 + y_screen**2 + z_screen**2)
 
-        # Calculate θ (altitude) = π/2 - cos⁻¹(z/√(x₀² + y² + z²))
+        # Calculate altitude (θ)
         z_over_sqrt = np.zeros_like(z_screen)
         valid_indices = sqrt_term > 0
         z_over_sqrt[valid_indices] = z_screen[valid_indices] / sqrt_term[valid_indices]
-        # Clip to handle numerical errors
         z_over_sqrt = np.clip(z_over_sqrt, -1.0, 1.0)
         theta = np.pi / 2 - np.arccos(z_over_sqrt)
 
-        # Calculate φ (azimuth) = tan⁻¹(-y/x₀)
+        # Calculate azimuth (φ)
         phi = np.zeros_like(y_screen)
         nonzero_indices = np.abs(x0) > 1e-10
         phi[nonzero_indices] = np.arctan2(-y_screen[nonzero_indices], x0)
 
         # Convert back to degrees
-        theta_deg = np.degrees(theta)
-        phi_deg = np.degrees(phi)
+        theta_deg = np.degrees(theta)  # altitude angle
+        phi_deg = np.degrees(phi)  # azimuth angle
 
-        # Use these coordinates to create our checkerboard pattern
-        # For a drifting grating that is a function of θ and constant in φ,
-        # we use S = cos(2πfsθ - tft), where fs is spatial frequency
+        # Extract coordinates only for the pixels within the bar
+        # bar_indices returns a tuple with y_indices, x_indices
+        y_indices, x_indices = bar_indices
+
+        # No need to check for out-of-bounds indices anymore, as the transform_drifting_bar
+        # method now guarantees all indices are valid
+
+        # Access the phi and theta values for these indices
+        phi_bar = phi_deg[y_indices, x_indices]
+        theta_bar = theta_deg[y_indices, x_indices]
 
         # Apply temporal phase for counter-phase checkerboard
         temporal_phase = (
@@ -429,18 +478,41 @@ class DriftingBarStimulus(
         )  # in radians
 
         # Create a checkerboard pattern using the spherical coordinates
-        checker_size = self.bar_width / 2  # Base size for the checker pattern
+        # Use grid_spacing_x and grid_spacing_y instead of bar_width/2 to ensure
+        # the checkerboard squares are exactly 25 degrees as specified in MMC1
+        checker_x_size = self.grid_spacing_x  # 25 degrees for x-direction
+        checker_y_size = self.grid_spacing_y  # 25 degrees for y-direction
 
-        # Align checker pattern to start at integer multiples of checker_size
+        # Align checker pattern to start at integer multiples of checker size
         # This ensures checker boundaries align exactly with our grid lines
-        theta_offset = np.floor(np.min(theta_deg) / checker_size) * checker_size
-        phi_offset = np.floor(np.min(phi_deg) / checker_size) * checker_size
+        if sweep_direction in ["left-to-right", "right-to-left"]:
+            # For horizontal sweep, use phi (azimuth) values to create checker pattern
+            phi_min = np.min(phi_bar)
+            phi_offset = np.floor(phi_min / checker_x_size) * checker_x_size
+            theta_min = np.min(theta_bar)
+            theta_offset = np.floor(theta_min / checker_y_size) * checker_y_size
 
-        # Create checkerboard using θ and φ, aligned to exact grid boundaries
-        checker_theta = np.floor((theta_deg - theta_offset) / checker_size) % 2
-        checker_phi = np.floor((phi_deg - phi_offset) / checker_size) % 2
+            # Create aligned checker pattern using spherical coordinates
+            checker_phi = np.floor((phi_bar - phi_offset) / checker_x_size) % 2
+            checker_theta = np.floor((theta_bar - theta_offset) / checker_y_size) % 2
+        else:
+            # For vertical sweep, use theta (altitude) values to create checker pattern
+            # Need to account for the meridian offset
+            adjusted_theta = (
+                theta_bar + self.spherical_correction.horizontal_meridian_offset
+            )
+            theta_min = np.min(adjusted_theta)
+            theta_offset = np.floor(theta_min / checker_y_size) * checker_y_size
+            phi_min = np.min(phi_bar)
+            phi_offset = np.floor(phi_min / checker_x_size) * checker_x_size
 
-        # Create checkerboard by XORing the patterns
+            # Create aligned checker pattern using spherical coordinates
+            checker_theta = (
+                np.floor((adjusted_theta - theta_offset) / checker_y_size) % 2
+            )
+            checker_phi = np.floor((phi_bar - phi_offset) / checker_x_size) % 2
+
+        # Create checkerboard by XORing the patterns (only for bar pixels)
         checkerboard = np.logical_xor(checker_theta, checker_phi).astype(np.float32)
 
         # Apply counter-phase flashing
@@ -449,10 +521,10 @@ class DriftingBarStimulus(
             checkerboard = 1 - checkerboard  # Invert the pattern
 
         # Convert to 0-255 range
-        checkerboard = (checkerboard * 255).astype(np.uint8)
+        bar_pixels = (checkerboard * 255).astype(np.uint8)
 
-        # Apply bar mask to limit checkerboard to the bar area
-        frame[bar_mask] = checkerboard[bar_mask]
+        # Place the processed pixels back into the frame using the corrected indices
+        frame[y_indices, x_indices] = bar_pixels
 
         return frame
 
@@ -640,7 +712,8 @@ class DriftingBarStimulus(
             Dict[str, Any]: Parameters for creating aligned grid lines
         """
         return {
-            "checker_size": self.bar_width / 2,  # Base checker size
+            "checker_size_x": self.grid_spacing_x,  # Exact 25° squares as in MMC1
+            "checker_size_y": self.grid_spacing_y,  # Exact 25° squares as in MMC1
             "grid_spacing_x": self.grid_spacing_x,
             "grid_spacing_y": self.grid_spacing_y,
             "screen_distance": self.spherical_correction.screen_distance,
