@@ -346,73 +346,115 @@ class DriftingBarStimulus(
         Returns:
             np.ndarray: The stimulus frame
         """
-        # Determine the current position based on frame index and sweep direction
-        sweep_direction = self.parameters.get("sweep_direction", "right-to-left")
+        frame = np.zeros(
+            (self._resolution[1], self._resolution[0]), dtype=np.uint8
+        )  # Start with a blank frame
 
-        # Calculate progress (0 to 1)
+        # Calculate the current position of the bar
         progress = frame_idx / max(1, self._frames_per_sweep - 1)
 
-        # Get precomputed transformed coordinates
-        x_deg = self._transformation_maps[sweep_direction]["x_deg"]
-        y_deg = self._transformation_maps[sweep_direction]["y_deg"]
-
-        # Calculate bar position in angular coordinates (degrees)
+        # Update the progress for the bar's position
+        sweep_direction = self.parameters.get("sweep_direction", "right-to-left")
         if sweep_direction in ["left-to-right", "right-to-left"]:
-            # Horizontal sweep (azimuth position)
-            bar_start_deg = -self.x_size / 2 - self.bar_width
-            bar_end_deg = self.x_size / 2 + self.bar_width
-            total_travel_deg = bar_end_deg - bar_start_deg
+            pos = (
+                -self.x_size / 2
+                - self.bar_width
+                + progress * (self.x_size + 2 * self.bar_width)
+            )
+        elif sweep_direction in ["bottom-to-top", "top-to-bottom"]:
+            pos = (
+                -self.y_size / 2
+                - self.bar_width
+                + progress * (self.y_size + 2 * self.bar_width)
+            )
+        else:
+            raise ValueError(f"Unknown sweep direction: {sweep_direction}")
 
-            if sweep_direction == "left-to-right":
-                bar_center_deg = bar_start_deg + progress * total_travel_deg
-            else:  # right-to-left
-                bar_center_deg = bar_end_deg - progress * total_travel_deg
+        # Generate raw coordinate grids - centered at (0, 0) in degree space
+        # Evenly spaced coordinates in visual degrees
+        y_degrees = np.linspace(-self.y_size / 2, self.y_size / 2, self._resolution[1])
+        x_degrees = np.linspace(-self.x_size / 2, self.x_size / 2, self._resolution[0])
 
-            # Create bar mask (1 inside bar, 0 outside)
-            bar_mask = np.abs(x_deg - bar_center_deg) < (self.bar_width / 2)
+        # Use meshgrid to create 2D coordinate grids
+        x_grid_raw, y_grid_raw = np.meshgrid(x_degrees, y_degrees)
 
-        else:  # vertical sweep
-            # Vertical sweep (altitude position)
-            bar_start_deg = -self.y_size / 2 - self.bar_width
-            bar_end_deg = self.y_size / 2 + self.bar_width
-            total_travel_deg = bar_end_deg - bar_start_deg
+        # Create the bar mask based on the sweep direction
+        if sweep_direction in ["left-to-right", "right-to-left"]:
+            # For horizontal sweeps, use untransformed x-coordinates for the bar position
+            bar_mask = np.abs(x_grid_raw - pos) < self.bar_width / 2
+        else:
+            # For vertical sweeps, use untransformed y-coordinates for the bar position
+            bar_mask = np.abs(y_grid_raw - pos) < self.bar_width / 2
 
-            if sweep_direction == "top-to-bottom":
-                bar_center_deg = bar_start_deg + progress * total_travel_deg
-            else:  # bottom-to-top
-                bar_center_deg = bar_end_deg - progress * total_travel_deg
+        # Get spherical correction parameters
+        screen_distance = self.spherical_correction.screen_distance  # cm
 
-            # Create bar mask (1 inside bar, 0 outside)
-            bar_mask = np.abs(y_deg - bar_center_deg) < (self.bar_width / 2)
+        # Convert degree coordinates to screen distances
+        # d = screen_distance * tan(θ)
+        x_rad = np.radians(x_grid_raw)
+        y_rad = np.radians(y_grid_raw)
 
-        # Create static checkerboard pattern
-        # For both horizontal and vertical sweeps, base the checkerboard on fixed spatial coordinates
-        cell_x = np.floor(x_deg / self.grid_spacing_x)
-        cell_y = np.floor(y_deg / self.grid_spacing_y)
+        # Get positions on screen (relative to straight-ahead point)
+        y_screen = screen_distance * np.tan(x_rad)  # Horizontal position
+        z_screen = screen_distance * np.tan(y_rad)  # Vertical position
+        x0 = screen_distance  # Distance from eye to screen
 
-        # Combine x and y to create a static checkerboard pattern
-        # This ensures the pattern is fixed in space rather than moving with the bar
-        checkerboard_base = np.mod(cell_x + cell_y, 2)
+        # Calculate sqrt term
+        sqrt_term = np.sqrt(x0**2 + y_screen**2 + z_screen**2)
 
-        # Create temporal alternation
-        # Calculate phase offset based on frame index
-        phase_offset = (frame_idx * self.temporal_freq / self.fps) % 1.0
+        # Calculate θ (altitude) = π/2 - cos⁻¹(z/√(x₀² + y² + z²))
+        z_over_sqrt = np.zeros_like(z_screen)
+        valid_indices = sqrt_term > 0
+        z_over_sqrt[valid_indices] = z_screen[valid_indices] / sqrt_term[valid_indices]
+        # Clip to handle numerical errors
+        z_over_sqrt = np.clip(z_over_sqrt, -1.0, 1.0)
+        theta = np.pi / 2 - np.arccos(z_over_sqrt)
 
-        # Create checkerboard pattern with alternating phase (vectorized)
-        phase_term = np.floor(phase_offset * 2)
-        checkerboard = np.mod(checkerboard_base + phase_term, 2)
+        # Calculate φ (azimuth) = tan⁻¹(-y/x₀)
+        phi = np.zeros_like(y_screen)
+        nonzero_indices = np.abs(x0) > 1e-10
+        phi[nonzero_indices] = np.arctan2(-y_screen[nonzero_indices], x0)
 
-        # Optimize memory allocation by reusing arrays
-        result = np.zeros_like(self._result_template)
+        # Convert back to degrees
+        theta_deg = np.degrees(theta)
+        phi_deg = np.degrees(phi)
 
-        # Apply bar mask to checkerboard using vectorized operations
-        result[bar_mask] = (checkerboard[bar_mask] * 255).astype(np.uint8)
+        # Use these coordinates to create our checkerboard pattern
+        # For a drifting grating that is a function of θ and constant in φ,
+        # we use S = cos(2πfsθ - tft), where fs is spatial frequency
 
-        # Apply GPU-based processing if available
-        if self._use_gpu:
-            result = self._apply_gpu_processing(result)
+        # Apply temporal phase for counter-phase checkerboard
+        temporal_phase = (
+            2 * np.pi * self.temporal_freq * frame_idx / self.fps
+        )  # in radians
 
-        return result
+        # Create a checkerboard pattern using the spherical coordinates
+        checker_size = self.bar_width / 2  # Base size for the checker pattern
+
+        # Align checker pattern to start at integer multiples of checker_size
+        # This ensures checker boundaries align exactly with our grid lines
+        theta_offset = np.floor(np.min(theta_deg) / checker_size) * checker_size
+        phi_offset = np.floor(np.min(phi_deg) / checker_size) * checker_size
+
+        # Create checkerboard using θ and φ, aligned to exact grid boundaries
+        checker_theta = np.floor((theta_deg - theta_offset) / checker_size) % 2
+        checker_phi = np.floor((phi_deg - phi_offset) / checker_size) % 2
+
+        # Create checkerboard by XORing the patterns
+        checkerboard = np.logical_xor(checker_theta, checker_phi).astype(np.float32)
+
+        # Apply counter-phase flashing
+        flash_state = np.sign(np.cos(temporal_phase)) > 0
+        if flash_state:
+            checkerboard = 1 - checkerboard  # Invert the pattern
+
+        # Convert to 0-255 range
+        checkerboard = (checkerboard * 255).astype(np.uint8)
+
+        # Apply bar mask to limit checkerboard to the bar area
+        frame[bar_mask] = checkerboard[bar_mask]
+
+        return frame
 
     def _generate_frame_job(self, frame_idx: int) -> Tuple[int, np.ndarray]:
         """
@@ -588,3 +630,20 @@ class DriftingBarStimulus(
             Tuple[int, int]: Resolution as (width, height)
         """
         return self._resolution
+
+    @property
+    def checker_parameters(self) -> Dict[str, Any]:
+        """
+        Get the parameters for checkerboard pattern to ensure grid lines match exactly.
+
+        Returns:
+            Dict[str, Any]: Parameters for creating aligned grid lines
+        """
+        return {
+            "checker_size": self.bar_width / 2,  # Base checker size
+            "grid_spacing_x": self.grid_spacing_x,
+            "grid_spacing_y": self.grid_spacing_y,
+            "screen_distance": self.spherical_correction.screen_distance,
+            "x_size": self.x_size,
+            "y_size": self.y_size,
+        }

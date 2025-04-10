@@ -91,6 +91,10 @@ class SphericalCorrection:
         """
         Transform normalized screen coordinates using spherical correction.
 
+        This implements the transformation from Cartesian coordinates to spherical coordinates:
+        θ (altitude) = π/2 - cos⁻¹(z/√(x₀² + y² + z²))
+        φ (azimuth) = tan⁻¹(-y/x₀)
+
         Args:
             x_norm: Normalized x coordinates (-1 to 1)
             y_norm: Normalized y coordinates (-1 to 1)
@@ -120,70 +124,84 @@ class SphericalCorrection:
         """
         Apply the spherical transformation to visual degree coordinates.
 
-        This implementation centers the equator of the sphere on the screen,
-        with the equator placed at the vertical center. This ensures that:
-        - Horizontal bars appear as horizontal straight lines
-        - Vertical bars follow longitude lines
-        - Proper spherical distortion occurs farther from the equator
+        Implements the mathematical transformation:
+        θ (altitude) = π/2 - cos⁻¹(z/√(x₀² + y² + z²))
+        φ (azimuth) = tan⁻¹(-y/x₀)
+
+        Where:
+        - x₀ is the distance from eye to screen
+        - y is the horizontal position on screen
+        - z is the vertical position on screen
 
         Args:
-            x_deg: X coordinates in visual degrees
-            y_deg: Y coordinates in visual degrees
+            x_deg: X coordinates in visual degrees (horizontal on screen)
+            y_deg: Y coordinates in visual degrees (vertical on screen)
 
         Returns:
             Tuple[np.ndarray, np.ndarray]: Transformed coordinates in visual degrees
         """
         # First apply horizontal meridian offset to y coordinates
-        # This positions the equator at the center of the screen
         y_deg_adjusted = y_deg - self.horizontal_meridian_offset
 
-        # Get the correction axis
+        # Get the correction axis and direction
         correct_axis = self.parameters.get("correct_axis", "azimuth")
+        sweep_direction = self.parameters.get("sweep_direction", "right-to-left")
 
-        # Initialize transformed coordinates
-        x_transformed = np.copy(x_deg)
-        y_transformed = np.copy(y_deg_adjusted)  # Start with the adjusted coordinates
+        # We need to map the degrees to actual distances
+        # Convert eye-to-screen distance to the same units
+        x0 = self.screen_distance  # Distance from eye to screen (cm)
 
-        # Apply the appropriate spherical transformation based on direction
+        # Convert degrees to distances on screen
+        # Using small angle approximation: tan(θ) ≈ θ (in radians)
+        # d = x0 * tan(θ)
+        y_rad = np.radians(x_deg)  # Horizontal on screen (azimuth)
+        z_rad = np.radians(y_deg_adjusted)  # Vertical on screen (altitude)
+
+        # Convert to distances on screen (relative to center)
+        y = x0 * np.tan(y_rad)  # Horizontal distance on screen
+        z = x0 * np.tan(z_rad)  # Vertical distance on screen
+
+        # Compute the spherical coordinates using the formulas
+        # θ (altitude) = π/2 - cos⁻¹(z/√(x₀² + y² + z²))
+        # φ (azimuth) = tan⁻¹(-y/x₀)
+
+        # Calculate the square root term
+        sqrt_term = np.sqrt(x0**2 + y**2 + z**2)
+
+        # Calculate altitude (θ)
+        # Handle potential division by zero or arguments outside [-1, 1]
+        z_over_sqrt = np.zeros_like(z)
+        valid_indices = sqrt_term > 0
+        z_over_sqrt[valid_indices] = z[valid_indices] / sqrt_term[valid_indices]
+        # Clip to handle numerical errors
+        z_over_sqrt = np.clip(z_over_sqrt, -1.0, 1.0)
+
+        # Calculate altitude using the formula θ = π/2 - cos⁻¹(z/√(x₀² + y² + z²))
+        theta = np.pi / 2 - np.arccos(z_over_sqrt)
+
+        # Calculate azimuth (φ)
+        # Handle potential division by zero
+        phi = np.zeros_like(y)
+        nonzero_indices = np.abs(x0) > 1e-10
+        phi[nonzero_indices] = np.arctan2(-y[nonzero_indices], x0)
+
+        # Convert back to degrees
+        theta_deg = np.degrees(theta)
+        phi_deg = np.degrees(phi)
+
+        # Apply appropriate transformation based on correction axis
         if correct_axis == "azimuth":
-            # For horizontal movement (bars along parallels):
-            # Convert degrees to radians
-            x_rad = np.radians(x_deg)
-            y_rad = np.radians(y_deg_adjusted)
-
-            # For horizontal bars to be properly curved while maintaining constant width
-            # Transform y coordinates based on distance from central meridian
-            # This creates the spherical curvature where horizontal bars bow away from the viewer
-            cos_longitude = np.cos(x_rad)
-
-            # Apply the scaling to y coordinates - multiply instead of divide to bow away
-            y_transformed = y_deg_adjusted * cos_longitude
-            x_transformed = x_deg
-
+            # For horizontal sweep, apply azimuth correction
+            x_transformed = phi_deg
+            y_transformed = theta_deg
         elif correct_axis == "altitude":
-            # For vertical movement (bars along meridians):
-            # Convert screen coordinates to proper longitude and latitude on sphere
+            # For vertical sweep, apply altitude correction
+            x_transformed = phi_deg
+            y_transformed = theta_deg
+        else:
+            raise ValueError(f"Unknown correction axis: {correct_axis}")
 
-            # Convert degrees to radians
-            x_rad = np.radians(x_deg)
-            y_rad = np.radians(y_deg_adjusted)
-
-            # Calculate proper spherical coordinates using a cylindrical projection
-            # centered on the equator
-
-            # For bars to follow longitude lines, transform x based on y position
-            # The farther from the equator, the more compressed x becomes
-            # This creates the spherical distortion where vertical bars curve at edges
-
-            # Calculate scaling factor based on distance from equator
-            # cos(latitude) gives the appropriate scaling for x coordinates
-            cos_latitude = np.cos(y_rad)
-
-            # Apply the scaling to x coordinates
-            x_transformed = x_deg * cos_latitude
-            y_transformed = y_deg_adjusted
-
-        # Apply the offset back to center the equator properly
+        # Apply the offset back to center properly
         y_transformed = y_transformed + self.horizontal_meridian_offset
 
         return x_transformed, y_transformed
