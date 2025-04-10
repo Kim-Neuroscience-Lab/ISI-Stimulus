@@ -1,0 +1,545 @@
+1
+
+Marshel, Garrett, Nauhaus & Callaway
+
+Neuron, Volume 72
+Supplemental Information
+
+Functional Specialization
+of Seven Mouse Visual Cortical Areas
+James H. Marshel, Marina E. Garrett, Ian Nauhaus, and Edward M.
+Callaway
+
+Supplemental Information
+I. Supplemental Data
+
+Table S1, related to Table 1. Further tabulation of numbers of neurons sampled by cortical
+area. Total neurons indicates number (N) of neurons recorded in the spatial frequency (SF) and
+temporal frequency (TF) experiments for each area. Number (N) and percent of total of
+responsive (∆F/F > 6%) and reliable neurons (δ > 1, Experimental Procedures) for each area.
+Neurons which were responsive and reliable, as well as representing eccentricities within 50° of
+the center of space (over 99% of responsive and reliable neurons) were included in subsequent
+population analyses. ―N Expts‖ refers to the number of fields of view (samples of neurons)
+recorded from for each area. This table (compared to Table 1) separates responsive from reliable
+criteria, and shows number of neurons passing eccentricity criteria for inclusion in our analysis.
+
+2
+
+Marshel, Garrett, Nauhaus & Callaway
+
+Figure S1, Related to Figure 1. Spherical coordinates transformed to a flat surface. A
+mathematical transformation (Supplemental Experimental Procedures) was applied to all stimuli
+so that they were displayed in spherical coordinates on a flat monitor (tangent to the
+hemisphere). (A) Altitude coordinates. Colors represent isoaltitude lines. This transformation
+was applied to drifting sine wave grating stimuli in order to keep spatial and temporal
+frequencies constant throughout the hemifield. It was also applied to vertical retinotopy stimuli
+(Movie S1). (B) Azimuth coordinates. Colors represent isoazimuth lines. This transformation
+was applied to horizontal retinotopy stimuli (Movie S2). The combination of altitude and
+azimuth-corrected retinotopy stimuli mapped retinotopic eccentricity in spherical coordinates
+using a flat monitor.
+
+3
+
+Figure S2
+
+Marshel, Garrett, Nauhaus & Callaway
+
+4
+
+Marshel, Garrett, Nauhaus & Callaway
+
+Figure S2, related to Figure 2. High-resolution retinotopic maps measured with low
+magnification two-photon calcium imaging reveal structural details of small visual areas.
+Fine-scale retinotopic organization of mouse visual cortex (A-H). Colors represent retinotopic
+eccentricity, as in Figure 2. Panels A & E show continuous vertical retinotopy maps, in altitude
+coordinates. Positive values indicate the upper field and negative values the lower field. Panels B
+& F show the corresponding contour plots of vertical eccentricity with area borders outlined in
+black. Panels C & G show continuous horizontal retinotopy maps, in azimuth coordinates, with
+positive values representing the nasal visual field and negative values representing the temporal
+visual field. Panels D & H show contour plots of horizontal retinotopy, overlaid with area
+borders. Area borders correspond to area diagram in Figure 1I. (A-D) Retinotopic organization
+of posterior-lateral extrastriate areas. The retinotopic structures of areas P and POR, often
+difficult to resolve using intrinsic imaging, are revealed by mapping with calcium imaging.
+Areas shown in (B, D) correspond to V1, AL, LI, POR, and P surrounding area LM
+counterclockwise.. The border between V1 and LM and AL is marked by a reversal at the
+vertical meridian (blue-purple, (C, D)). LM and LI are separated by a reversal at the temporal
+periphery (yellow-green, (C,D)). AL is separated from LM by a reversal near the horizontal
+meridian (purple-blue (A, B)). A reversal in horizontal retinotopy separates both P and POR
+from areas LM and LI (yellow-red, (C,D)). The border between P and POR occurs at the
+representation of the upper periphery (purple (A, B)). (E-H) Retinotopic organization of anterior
+extrastriate areas, located in the posterior parietal cortex. Areas shown in (F, H) include LM, AL,
+RL, A, AM, PM, V1 (starting at lower left, moving clockwise). The retinotopic structure of all
+areas is consistent with maps displayed in Figure 2. Fine-scale features resolved by calcium
+imaging include a ring like structure in the representation of the vertical meridian in area RL
+(purple, (G, H)), as well as an organized representation of the visual field in both the horizontal
+and vertical dimension for areas AM and PM (right, (F, H)). Here, visual activation is observed
+in the expected location of area A, however, a clear retinotopic structure is not apparent. This
+area receives less-organized (less topographic) input from V1 than the other areas (Wang and
+Burkhalter 2007). All scale bars 500 µm.
+
+5
+
+Figure S3
+
+Marshel, Garrett, Nauhaus & Callaway
+
+6
+
+Marshel, Garrett, Nauhaus & Callaway
+
+Figure S3, related to Figure 3. Responses are robust and selective across visual areas.
+Calcium responses and tuning curves for example cells from each visual area. Response matrices
+(upper plots) show the change in fluorescence over baseline for each stimulus condition, for the
+spatial frequency (SF) experiment (top of each panel) and temporal frequency (TF) experiment
+(middle of each panel). The average response across all trials of a given condition is shown in
+black, with the responses to each trial in gray. Gray boxes indicate the duration of the stimulus, 2
+seconds for SF experiments, 4 seconds for TF experiments. Scale bars to lower right of matrices
+correspond to 40% F/F. Tuning curves (bottom of each panel) were generated by taking the
+average F/F for each stimulus condition, at the intersection of the matrix that gave the peak
+response. Orientation tuning curves (yellow boxes) are taken across all orientations at the
+preferred spatial frequency, spatial frequency tuning curves (orange boxes) are taken across all
+spatial frequencies at the preferred orientation, and temporal frequency tuning curves (magenta
+boxes) are taken across all temporal frequencies at the preferred orientation. Values for preferred
+stimuli and selectivity metrics are listed above each tuning curve. OSI = orientation selectivity
+index, DSI = direction selectivity index, LC = low cutoff frequency, HC = high cutoff frequency,
+BW = bandwidth. (A) Example cell from V1. This cell is highly orientation selective, is
+bandpass for spatial frequency and lowpass for temporal frequency, preferring the lowest TF
+tested (0.5 Hz). (B) Example cell from LM. This cell is perfectly orientation selective (OSI = 1),
+bandpass for spatial frequency with broad tuning (BW = 3.5 octaves), and highpass for temporal
+frequency, preferring the highest temporal frequency tested (8 Hz). (C) Example cell from LI.
+This cell is broadly tuned for orientation, responding similarly to all orientations across all
+stimulus conditions (OSI = 0.18) and prefers high spatial frequencies (highpass, pref. SF = 0.16
+cpd), and low temporal frequencies (1 Hz). (D) Example cell from AL. This cell is highly
+orientation selective, bandpass for spatial frequency with moderately sharp tuning (BW = 2.3
+octaves) and broadly tuned for temporal frequency (BW= 3.5 octaves). (E) Example cell from
+RL. This cell is highly selective for direction, responding primarily to only one direction of
+motion for the same orientation (DSI = 0.65), and is highly selective for spatial frequency, with a
+bandwidth of 1.5 octaves. (F) Example cell from AM. This cell is orientation selective, has
+moderate spatial frequency selectivity (pref. SF = 0.4cpd, BW = 2 octaves), and responds
+similarly to all temporal frequencies.
+
+(G) Example cell from PM. This cell is orientation
+
+selective, is highpass for spatial frequency, and responds weakly across temporal frequencies.
+
+7
+
+Marshel, Garrett, Nauhaus & Callaway
+
+Figure S4, related to Figure 4. Mean temporal frequency bandwidth across visual areas.
+Mean temporal frequency bandwidth (in octaves) is higher in several extrastriate areas (LM, AL,
+RL) compared to V1, indicating that neurons in these areas respond to a broader range of
+temporal frequencies on average. Inset, statistical significance (p < 0.05) of pair-wise
+comparisons between areas, corrected for multiple comparisons by the Tukey-Kramer method.
+Error bars are standard error of the mean (S.E.M.).
+
+Figure S5, related to Figure 5. Mean spatial frequency bandwidth across visual areas. Mean
+spatial frequency bandwidth (in octaves) is sharper in all extrastriate areas except LI, indicating
+that higher visual areas are more selective for spatial frequency than V1. Further, some
+extrastriate areas (AL, RL, AM) have significantly sharper bandwidth values than LM. Inset,
+statistical significance (p < 0.05) of pair-wise comparisons between areas, corrected for multiple
+comparisons by the Tukey-Kramer method. Error bars are standard error of the mean (S.E.M.).
+
+8
+
+Figure S6
+
+Marshel, Garrett, Nauhaus & Callaway
+
+9
+
+Marshel, Garrett, Nauhaus & Callaway
+
+Figure S6, related to Figure 7. Correlation analyses between each pair of metrics on a cellby-cell basis for each area. Scatter plots of neuron scores for each combination of selectivity
+metrics for each area. Area names at top of figure correspond to the entire column of scatter
+plots. Pearson‘s correlation coefficients (R) are listed above each plot for each area, along with
+the p value corresponding to a significance test against zero correlation (α < 5% for p < 0.007
+after accounting for multiple comparisons with the Bonferroni method). (A) The preferred spatial
+frequency of each neuron is plotted as a function of preferred temporal frequency of each neuron
+for each area. Note: not all neurons in our dataset received scores for both spatial and temporal
+frequencies (e.g., we did not record from them in both experiments), thus the populations in the
+plots in (A) are a subset of the populations used in other analyses of SF and TF experiments
+alone. (B) The orientation selectivity index (OSI) of each neuron is plotted as a function of
+direction selectivity index (DSI) of each neuron for each area. (C) Preferred temporal frequency
+of each neuron is plotted as a function of OSI of each neuron for each area. (D) Preferred
+temporal frequency of each neuron plotted as a function of DSI of each neuron for each area. (E)
+Preferred spatial frequency of each neuron plotted as a function of OSI of each neuron for each
+area. (F) Preferred spatial frequency of each neuron as a function of DSI of each neuron for each
+area.
+
+Movie S1, related to Figure 1. Vertical retinotopy visual stimulus. To map vertical
+retinotopy, a single bar was drifted across the full upper-lower extent of the visual hemifield
+while intrinsic signals or calcium transients were measured from the brain. An altitude spherical
+correction was applied to accurately project spherical coordinates onto a flat monitor. This gives
+the impression of a bar that is curved on the flat screen, but when observed at the appropriate
+distance, and with infinite focus (as in the mouse preparation) the bar defines altitude lines on a
+sphere. See Supplemental Experimental Procedures for details on stimulus parameters.
+Movie S2, related to Figure 1. Horizontal retinotopy visual stimulus. To map horizontal
+retinotopy, a single bar was drifted across the full nasal-temporal extent of the visual hemifield
+while intrinsic signals or calcium transients were measured from the brain. An azimuth spherical
+correction was applied to accurately project spherical coordinates onto a flat monitor. This gives
+the impression of a bar that modulates in width on the flat screen, but when observed at the
+
+10
+
+Marshel, Garrett, Nauhaus & Callaway
+
+appropriate distance, and with infinite focus (as in the mouse preparation) the bar defines
+azimuth lines on a sphere. See Supplemental Experimental Procedures for details on stimulus
+parameters.
+
+II. Supplemental Experimental Procedures
+Animal Preparation and Surgery
+All experiments involving living animals were approved by the Salk Institute‘s Institutional
+Animal Care and Use Committee. All experiments were performed using C57BL/6 mice (n =
+28) between 2 and 3 months of age. Surgical plane anesthesia was induced and maintained with
+isoflurane (2-2.5% induction, 1-1.25% surgery). Dexamethasone and carprofen were
+administered subcutaneously (2 mg/kg and 5 mg/kg respectively). Ibuprofen (30 mg/kg) was
+administered post-operatively in the drinking water if the animal recovered overnight after
+implanting the recording chamber. A custom-made metal chamber was mounted to the skull,
+centered on the visual cortex of the left hemisphere using stereotaxic coordinates. The frame
+was mounted so that it was as close to the skull as possible, tilted to be tangent to the brain
+surface. The angle of tilt was recorded using a digital protractor by measuring the tilt of the
+stereotaxic frame (Narishige) used to parallelize the frame relative to the table. The skull
+overlying visual cortex was carefully thinned with a dental drill, stopping often and rinsing with
+chilled artificial cerebral spinal fluid (ACSF, in mM: 125 NaCl, 10 d-glucose, 10 HEPES, 3.1
+CaCl2, 1.3 MgCl2; or 150 NaCl, 2.5 KCl, 10 HEPES, 2 CaCl2, 1 MgCl2). Great care was taken
+to prevent overheating of the brain or subdural bleeding. The bone was thinned just past the
+spongy middle layer which often contained blood vessels. The resultant preparation was a thin
+layer of semi-flexible bone that was sufficiently transparent to reveal the brain‘s surface
+vasculature. This was especially relevant for alignment of cortical blood vessel landmarks with
+functional retinotopic maps. For calcium imaging experiments, a craniotomy was made to reveal
+the cortex for calcium indicator dye loading and subsequent two-photon imaging. After the
+surgery, chlorprothixene (2.5 mg/kg) was administered intramuscularly to the quadriceps and
+isoflurane was reduced to 0.25-0.8%, for visual stimulation and recording experiments. The
+
+11
+
+Marshel, Garrett, Nauhaus & Callaway
+
+most robust visual responses coincided with higher respiration rates when the animal appeared to
+be lightly anesthetized.
+
+Intrinsic Signal Optical Imaging
+The intrinsic signal imaging protocol was adapted from previous studies (Kalatsky and Stryker,
+2003; Nauhaus and Ringach, 2007). Imaging setup is as described in Nauhaus and Ringach,
+2007. All other relevant modifications are described elsewhere in the text.
+
+Dye Loading and Two-Photon Imaging
+The retinotopic map from the intrinsic signal imaging experiment aligned and overlayed with the
+image of the cortical blood vessels from the same animal was used as a reference for targeting
+the locations of calcium-sensitive dye loading. The dye solution contained 1mM Oregon Green
+Bapta-1 AM (OGB, Invitrogen) with 10% DMSO and Pluronic F-127 in ACSF (Stosiek et al.,
+2003; Ohki et al., 2005). The solution also included 50 µM sulforhodamine-101 to selectively
+label astrocytes (Nimmerjahn et al., 2004). The pipette (3-5 µm outer diameter tip) was lowered
+diagonally (30° from horizontal) to 225 µm below the dura surface (layer 2/3) while short pulses
+of pressure were applied to the back of the pipette to keep the tip clear of debris. Then, a single
+pulse of 1 min duration and 10 PSI was applied for the loading protocol. This typically resulted
+in approximately 0.5-1 mm2 of OGB loading. The loading was observed under epifluorescence
+to confirm sufficient dye injection. In most cases, several locations were injected in the same
+animal often using the same pipette multiple times, resulting in an area of OGB loading spanning
+up to several millimeters. Each loading site was separated by approximately 0.5-1mm. At least
+one hour after the last loading the two-photon imaging began.
+A custom-built Movable Objective Microscope (Sutter) coupled to a Chameleon Ultra II
+mode-locked Ti:Sapphire laser (Coherent) was used for two-photon imaging. Standard
+wavelength for two-photon microscopy was 920-950 nm. A waveplate (Newport) was used in
+conjunction with a beamsplitter cube (Newport) to modulate the power of the excitation laser
+light. A 16X water-immersion objective (Nikon) was used for low magnification retinotopy
+experiments, and a 40X water-immersion objective (Olympus) was used to measure cellular
+responses. Fluorescent light was detected by photomultiplier tubes (Hamamatsu), after being
+filtered by one of two emission filter sets: HQ535/50, and HQ610/75 (Chroma).
+
+A third
+
+12
+
+Marshel, Garrett, Nauhaus & Callaway
+
+acquisition channel was used to record the output of a photodiode to detect a brief pulse of light
+at the corner of the screen, which precisely indicated the phase of the periodic visual stimulus
+(e.g., drifting bar retinotopy stimulus), in addition to the stimulus beginning and end. ScanImage
+software (Pologruto et al., 2003) was used for image acquisition. Images and time lapse videos
+were processed offline in Matlab (MathWorks) and ImageJ (http://rsbweb.nih.gov/ij/). Imaging
+experiments were performed at ~130-180 µm below the dura surface (layer 2/3). For retinotopy
+experiments, images were typically acquired at approximately 2 Hz (256 x 256 pixel frames,
+unidirectional scanning, ~800 x 800 µm field of view for low magnification imaging with the
+16X objective). For recording cellular responses, images were typically acquired at
+approximately 8 Hz (256 x 256 pixel frames, bidirectional scanning, either ~150 x 150 µm or
+~300 x 300 µm field of view with the 40X objective). The 40X objective provided theoretically
+higher resolution than the 16X objective despite having identical numerical aperture (0.8 N.A.).
+This was because the 16X back aperture was under filled by the beam size possible on the
+microscope, reducing the effective N.A., whereas the 40X back aperture was over filled. For this
+reason, we used the 40X for cellular imaging experiments to obtain higher resolution. It should
+be noted that cellular responses were detected in our setup with the 16X objective, albeit with
+theoretically somewhat lower resolution. Different optics may make it possible to use the 16X
+alone for experiments of this nature. After each experiment in a given location, a stack of images
+(5 µm z step) was taken starting at the experiment image plane and ending above the dura in
+order to determine the precise depth of the experiment offline. Images were taken of the
+overlying surface blood vessel pattern in order to register images taken during experiments with
+the 40X objective with those with the 16X objective, and with the intrinsic imaging experiments.
+High-resolution images (1024 x 1024 pixel frames) were often taken of the experiment imaging
+plane as an anatomical reference of the cells recorded.
+
+Visual Stimulation
+Drifting bar and drifting grating stimuli were displayed on a gamma-corrected, large
+LCD display (68 x 121 cm, 120 Hz monitor, stimulus presented at 60Hz), rotated in ‗portrait‘
+mode such that the monitor was taller than it was wide, with the stimulus subtending 153 degrees
+of visual space along the vertical axis and 147 degrees along the horizontal axis. This results in a
+stimulus that is larger than the extent of the entire known visual hemifield of the mouse, which is
+
+13
+
+Marshel, Garrett, Nauhaus & Callaway
+
+estimated to be at most 110 degrees vertical, 140 degrees horizontal (Wagor et al., 1980). The
+perpendicular bisector of the eye was defined as the origin of the line perpendicular to the screen
+that intersected with the center of the mouse‘s eye. This point defined 0° altitude and 0° azimuth
+of the stimulus.
+The screen was placed at an angle of 20° relative to the animal around its dorsoventral
+axis such that the screen was pointed slightly inward toward the animal‘s nose. Since the eyes of
+the mouse point slightly inward towards the nose, this positioning ensures that the stimulus is
+approximately parallel to the retina, and properly stimulates the vertical meridian. The screen
+was also tilted to match the tilt of the animal relative to its normal position around its
+anteroposterior axis resulting from the angled placement of the recording chamber. For example,
+if the recording chamber was angled 20° from the normal horizontal plane of the mouse (as was
+necessary to access far lateral extrastriate areas), resulting in a corresponding tilt of the head
+when the chamber was held horizontal in the frame, the screen was also tilted 20° to ensure that
+the stimulus was parallel to the retina. Thus, in this configuration 0° altitude is defined as the
+plane passing through the center of the eyes parallel to the ground, even after the rotation is
+applied to the animal‘s head and the screen. It is important to note that the mouse‘s eyes are
+rotated slightly in the skull, so this definition of 0° altitude is not the center of the retina. Instead,
+we approximated the horizontal meridian to be approximately 20° altitude in this configuration.
+Thus 20° vertical (altitude) eccentricity should be considered the horizontal meridian in the
+retinotopic maps presented in this study (Figure 1, 2 and S2).
+The screen was positioned so that the perpendicular bisector was 28 centimeters from the
+bottom of the screen, centered on the screen left to right (34 centimeters on each side), and 10 cm
+from the eye. This positioning of the monitor, in conjunction with the spherical stimulus
+correction described below, accurately simulated a hemispherical display around the mouse. This
+results in a stimulus that maintains constant spatial frequency at all locations. Furthermore, a
+distance of 10 cm between the eye and the stimulus is beyond the theoretical point of ‗infinite
+focus‘ of the mouse eye (Remtulla and Hallett, 1985; Green et al., 1980; de la Cera et al., 2006),
+leading to similar focus at all points on the screen.
+For both intrinsic imaging and low magnification calcium imaging retinotopy
+experiments, a periodic drifting bar stimulus was used (Kalatsky and Stryker, 2003). The bar
+was 20° wide and subtended the whole visual hemifield along the vertical and horizontal axes
+
+14
+
+Marshel, Garrett, Nauhaus & Callaway
+
+(153° or 147° respectively). The bar was drifted 10 times in each of the four cardinal directions.
+A counter-phase checkerboard pattern was flashed on the bar, alternating between black and
+white (25° squares with 166 ms period) to strongly drive neural activity (Movie S1 and S2).
+Azimuth correction was used for the bar drifting along the horizontal axis and altitude correction
+was used for the bar drifting along the vertical axis (see below), in order to define eccentricity
+using standard spherical coordinates. By drifting the bar in both directions along a given axis it
+was possible to subtract the delay in the intrinsic signal relative to neural activity (Kalatsky and
+Stryker, 2003; see Data Analysis). The bar drifted at 8.5-9.5°/s for intrinsic imaging experiments
+and at 12-14°/s for two-photon imaging experiments.
+For cellular resolution calcium imaging experiments, sinusoidal drifting gratings were
+used. For each population of neurons imaged (a single 40X imaging plane), we presented (with
+rare exceptions) four sets of stimuli: a temporal frequency varying experiment (0.5, 1, 2, 4 and 8
+Hz, 8 directions plus blank, ~0.04 cpd, 5 repeats pseudorandomized for each parameter
+combination), a spatial frequency varying experiment (0.01, 0.02, 0.04, .08 and 0.16 cpd, 8
+directions plus blank, ~1 Hz, 5 repeats pseudorandomized for each parameter combination), a 12
+direction orientation tuning experiment (~1 Hz, ~0.04 cpd, 5 repeats pseudorandomized for each
+parameter combination and a blank condition), and a drifting bar retinotopy experiment (same
+stimulus as for the low magnification 16X retinotopy experiments). The retinotopic mapping
+experiment was performed with the 40x objective at cellular resolution to obtain a precise
+eccentricity value for each neuron in the field of view. This eccentricity value was used to
+restrict analysis to neurons with receptive fields within 50 degrees of the center of space, and
+ensure that the populations from each visual area represented similar regions of space (see Data
+Analysis section). A gray screen (mean luminance of grating stimuli) was shown between trials
+and during the prestimulus baseline period. Stimulus durations were 4 sec for the temporal
+frequency experiment and 2 sec for the spatial frequency and 12 direction experiments (Note:
+data are not presented for the 12 direction experiments). Population data from previous
+experiments in each area and from published data from V1 (e.g., Niell and Stryker, 2008) were
+used to determine the value for the parameters held constant in each experiment in an effort to
+strongly stimulate as large a population as possible, and keep parameters consistent across visual
+areas. An altitude correction was used to account for the spherical distortion of the flat monitor
+for spatial frequency, temporal frequency and orientation experiments. The isoluminance lines
+
+15
+
+Marshel, Garrett, Nauhaus & Callaway
+
+of this stimulus are analogous to the altitude lines of a globe. That is, they form parallel rings
+that are evenly spaced in eccentricity. This correction held the spatial frequency and temporal
+frequency constant throughout the wide visual field.
+Spherical corrections were applied to all stimuli in order to account for the distortions
+created by displaying stimuli to the animal on a flat monitor (Figure S1, Movie S1 and S2).
+Without correction, the spatial frequency and temporal frequency of a drifting grating shrink
+rapidly with eccentricity—a problem present in any study using a flat screen, but especially
+pronounced without appropriate correction in our study, which used a very large screen. Drifting
+bar and grating stimuli were generated through custom routines in Psychtoolbox and Matlab and
+then transformed with spherical projection, as described below.
+
+Spherical Stimulus Correction
+Retinotopic coordinates are often defined in units of degrees of visual field, a spherical
+parameter. However, monitors are flat, which means that spatial frequency (cyc/deg) and speed
+(cyc/sec) become gradually reduced for larger eccentricities when they are kept constant in
+cycles/centimeter. When the eccentricities are kept to reasonably low values (e.g. <30o), this
+distortion is small. However, our experiments call for stimulation over a large enough region of
+visual space that this distortion becomes quite substantial.
+
+For example, a drifting bar that is
+
+kept constant in its width (cm) and speed (cm/sec) will become dramatically smaller (degrees)
+and slower (deg/sec) at the largest eccentricities of our stimulus. We thus defined our stimuli
+such that the angular variables in spherical coordinates (altitude or azimuth) are the independent
+variables. For example, our sine wave gratings were defined as a function of spherical variables,
+and these values were then projected onto a flat surface.
+In our 3-dimensional coordinate system, we defined the eye as the origin. For the reasons
+described above, our desired visual stimuli are initially described as a function of altitude, θ, and
+azimuth, ф: S(θ,ф). The spherical coordinate space is oriented such that the perpendicular
+bisector from the eye to the monitor is the (0o,0o) axis of the altitude/azimuth coordinates,
+altitude increases above the mouse, and azimuth increases anterior to the mouse. Next, we
+convert these spherical coordinates to Cartesian coordinates so that they can be drawn on the
+monitor. To do so, we orient the Cartesian space so that the perpendicular bisector between the
+
+16
+
+Marshel, Garrett, Nauhaus & Callaway
+
+eye and the monitor is the x-axis. The y and z axes are defined as the horizontal and vertical
+dimensions on the monitor, with the x-dimension a constant on the monitor surface (xo). We can
+now define the stimulus as a function of the horizontal (y) and vertical (z) pixel locations:
+
+Next, we define a drifting grating that is a function of altitude, θ , and constant in ф. We
+start with S = cos(2πfsθ - tft), where ‗fs‘ is the spatial frequency (cycles/radian), ‗ft‘ is the
+temporal frequency (radians/second), and ‗t‘ is time. We then apply the polar-to-Cartesian
+transformation, which gives us
+
+To change the ‗orientation‘ of the drifting grating, we rotate it counterclockwise around
+the x-axis. This is done by applying a rotation of the y/z plane, which can be obtained by
+redefining y in the above equation as
+z*sin(-φ) + y*cos(-φ), and z as z*cos(-φ) –y*sin(-φ).
+
+We have thus defined a drifting grating with contours along altitude lines that have been
+oriented by ‗φ‘. The stimulus is drawn on the monitor using the y and z domains.
+
+Data Analysis
+Intrinsic optical imaging retinotopy data were analyzed as previously described (Kalatsky and
+Stryker, 2003). Briefly, data were acquired in a continuous block during stimulus presentation of
+a bar drifting in one direction periodically. The phase of response relative to the stimulus was
+computed for each pixel by computing the phase of the Fourier component at the same frequency
+as the stimulus. Contrasting this phase difference with the data from the bar drifting in the
+opposite direction along the same axis made it possible to estimate the center point between
+them, accounting for the hemodynamic delay, and thus determining the best estimate of the
+position in space that the cortical location responded to. A comparable approach was used to
+analyze Ca2+ imaging retinotopy experiments.
+
+17
+
+Marshel, Garrett, Nauhaus & Callaway
+For population analyses of cellular responses to drifting gratings, data were preprocessed
+
+in the following ways. Each experiment (e.g., temporal frequency varying experiment) typically
+lasted approximately 30-45 minutes. To account for drifts in the image over time, we applied a
+movement correction algorithm that aligned each trial of the experiment to the average image of
+the first trial by determining the highest cross-correlation between the images. Then regions of
+interest (ROIs) around each cell in the image were created using a semi-automated procedure,
+separately for the OGB channel (neurons and glia) and the sulfarhodamine-101 channel (glia).
+Candidate ROIs were determined by thresholding an image of the field of view that had first
+been processed with a local Z-score to normalize the local statistics. Then, ROIs were carefully
+edited manually for both channels. Glia cells were removed from the analysis of the OGB
+channel by removing any ROIs in the OGB channel that overlapped with ROIs marked in the
+glia channel. The remaining ROIs in the OGB channel were neurons. The pixels were averaged
+within each of these ROIs for each time point (each single image) to reflect the raw time course
+of a given neuron.
+In order to link neuron identities across experiments (e.g., to perform spatial and temporal
+frequency cell-by-cell correlations), we found the relative position between the ROI maps for
+each experiment that maximized the cross-correlation. Then we determined the cell ROIs which
+overlapped across the ROI maps for each experiment by at least 3 pixels (the great majority of
+neurons were overlapping) and created a new ROI map with unique identifiers of each common
+neuron. Inverse transformations were applied to each ROI map so that each map realigned with
+each original experiment. The end result was a common ROI map that identified neurons across
+multiple experiments within the same field of view that accounted for any drifts in the imaging
+field of view over the course of the imaging session.
+The baseline calcium fluorescence signal was averaged within each cell ROI for each
+trial during a prestimulus period during which a gray screen was shown (1 sec). Then, the entire
+time course was converted from absolute fluorescence values to the percent change relative to
+baseline by computing the following: ∆F/F = (FI-F)/F, where FI is the instantaneous
+fluorescence signal and F is the baseline fluorescence. The ∆F/F response for each cell was
+averaged during a two-second window following stimulus onset for each trial, and the mean and
+standard deviation across trials for each stimulus and blank condition were computed for each
+neuron. We applied several criteria to include neurons in further population analyses. Neurons
+
+18
+
+Marshel, Garrett, Nauhaus & Callaway
+
+were deemed visually responsive if they gave a mean response above 6% ∆F/F to any of the
+stimuli. A response reliability metric (δ) was computed for each neuron as follows:
+
+where µmax and σmax are the mean and standard deviations of the response to the preferred
+stimulus respectively, and µblank and σblank are the mean and standard deviations of the response
+to the blank stimulus respectively. Neurons were deemed reliable for δ > 1. Finally, neuron
+eccentricity mapped with the retinotopy stimulus was used to restrict our population analyses to
+eccentricity-matched neurons within 50° of the center of space (see Table S1). The numbers of
+neurons which met all of these criteria were used as the denominator in all subsequent analyses
+of fraction of neurons exhibiting a particular score on a given parameter.
+
+Tuning Metrics
+Temporal and spatial frequency tuning curves were taken at the optimal orientation and direction
+for each neuron, using the average ∆F/F response for each condition across trials. These tuning
+curves were fit with a Difference of Gaussians function (Sceniak et al., 2002). A log2 transform
+was performed on the x-axis of the curves, converting it to octaves. The preferred frequency was
+taken at the peak (maximum) location of this curve. For bandwidth and low and high cutoff
+measurements, each cell was characterized as either bandpass, highpass or lowpass for temporal
+and spatial frequency based on whether its minimum and/or maximum frequency response
+passed below the half max for the tuning curve. The high cutoff was computed for bandpass and
+lowpass cells as the highest frequency which drove a half-max response. Low cutoff was
+computed for bandpass and highpass cells as the lowest frequency which drove a half-max
+response. Bandwidth was measured for bandpass cells as the difference between high cutoff and
+low cutoff.
+The orientation and direction tuning curves were taken at the optimal spatial frequency
+for each neuron, using the average ∆F/F response for each condition across trials. The orientation
+selectivity index (OSI) was computed as follows:
+
+19
+
+Marshel, Garrett, Nauhaus & Callaway
+
+where µmax is the mean response to the preferred orientation and µorth is the mean response to the
+orthogonal orientation (average of both directions). The direction selectivity index was computed
+as follows:
+
+where µmax is the mean response to the preferred direction and µopp is the mean response to the
+opposite direction. The half-width at half-maximum (HWHM) was computed for each neuron‘s
+orientation and direction tuning curves but our results suggested that we did not adequately
+sample the direction domain to make comparisons based on these measurements (i.e., neurons
+may have had sharper tuning widths than our sampling of the direction domain could detect).
+
+Statistics
+We started with the most basic question: are mouse cortical visual areas distinguishable based on
+population tuning metrics? We asked this question statistically using a multivariate analysis of
+variance (MANOVA) on the four values we computed for every neuron in our sample from each
+area: preferred temporal frequency, preferred spatial frequency, orientation selectivity index and
+direction selectivity index. We also computed bandwidth and high and low cutoff metrics for
+each population, however not every neuron received a value for all of these metrics and thus we
+excluded these metrics from the multivariate analysis. We followed up this analysis with
+individual univariate analyses to confirm whether there was a main effect of area on each of our
+dependent variables (both one-way ANOVA and one-way Kruskal-Wallis tests). Finally, for
+each significant one-way test, we performed post-hoc pairwise comparisons to determine which
+areas were different from each other in terms of each metric, correcting the p value for multiple
+comparisons using the Tukey-Kramer Honestly Significant Difference (HSD). Pearson
+correlation coefficients and statistical significance compared against no correlation were
+computed using Matlab routines, and the p value was corrected for multiple comparisons using
+the Bonferroni method (Figure S6).
+
+20
+
+Marshel, Garrett, Nauhaus & Callaway
+
+III. Supplemental References
+Pologruto, T.A., Sabatini, B.L., and Svoboda, K. (2003). ScanImage: flexible software for
+operating laser scanning microscopes. Biomedical engineering online 2, 13.
+Remtulla, S., and Hallett, P.E. (1985). A schematic eye for the mouse, and comparisons with the
+rat. Vision Res 25, 21-31.
+Green, D.G., Powers, M.K., and Banks, M.S. (1980). Depth of focus, eye size and visual acuity.
+Vision Res 20, 827-835.
+de la Cera, E.G., Rodriguez, G., Llorente, L., Schaeffel, F., and Marcos, S. (2006). Optical
+aberrations in the mouse eye. Vision Res 46, 2546-2553.
+
+

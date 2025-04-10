@@ -1,0 +1,1171 @@
+# src/stimuli/checkerboard/checkerboard_stimulus.py
+"""Checkerboard pattern stimulus module."""
+
+import numpy as np
+import logging
+from typing import Dict, Any, Optional, Tuple
+
+
+def register_module(parameter_config):
+    """
+    Register this module with the parameter configuration.
+
+    Args:
+        parameter_config: The parameter configuration object
+    """
+    # Register CHECKERBOARD as a module type
+    parameter_config.register_module_factory("CHECKERBOARD", create_default_parameters)
+
+
+def create_default_parameters() -> Dict[str, Any]:
+    """
+    Create default parameters for the checkerboard stimulus.
+
+    Returns:
+        Dict[str, Any]: The default parameters
+    """
+    return {
+        # Pattern type
+        "pattern": "checkerboard",  # 'grid' or 'bars' or 'checkerboard'
+        # Grid parameters
+        "grid_spacing_x": 5.0,  # degrees
+        "grid_spacing_y": 5.0,  # degrees
+        "line_width": 0.5,  # degrees
+        # Cell count control (overrides grid_spacing when specified)
+        "cells_x": 0,  # Number of cells in x direction (0=auto)
+        "cells_y": 0,  # Number of cells in y direction (0=auto)
+        "cell_ratio": 1.0,  # Ratio of cells in y/x direction
+        # Basic stimulus parameters
+        "orientation": 0.0,  # degrees
+        "temporal_freq": 2.0,  # Hz
+        "phase": 0.0,  # degrees
+        "contrast": 100.0,  # percent
+        # Size and position
+        "x_size": 30.0,  # degrees
+        "y_size": 30.0,  # degrees
+        "x_pos": 0.0,  # degrees from center
+        "y_pos": 0.0,  # degrees from center
+        # Background
+        "background": 127,  # 0-255
+        # Mask parameters
+        "mask_type": "none",  # 'none', 'gaussian', 'circle'
+        "mask_radius": 15.0,  # degrees
+        "mask_sigma": 5.0,  # degrees (for gaussian)
+        # Timing
+        "duration": 1.0,  # seconds
+        # Direction
+        "reverse": 0,  # 0 = no, 1 = yes (reverse direction)
+        # New features
+        "progressive": False,  # True = progressively appear, False = periodic movement
+        "sweep_direction": "left-to-right",  # 'left-to-right', 'right-to-left', 'top-to-bottom', 'bottom-to-top'
+        "transformed_sweep": True,  # Whether the sweep should follow the transformation
+        # Transformation options
+        "transformation": "none",  # 'none', 'spherical', 'hyperbolic'
+        "eye_radius": 0.17,  # cm (mouse eye radius)
+        "eye_distance": 25.0,  # cm (distance from eye to screen)
+        "screen_distance": 25.0,  # cm (distance from viewer to screen)
+        "correction_strength": 0.3,  # Strength of distortion correction
+        # Resolution handling
+        "resolution_mode": "stretch",  # 'stretch' or 'fill'
+    }
+
+
+class CheckerboardStimulus:
+    """
+    Checkerboard pattern stimulus generator.
+
+    This class generates checkerboard patterns for visual neuroscience experiments,
+    with options for:
+    - Checkerboard, grid or bar patterns
+    - Spherical or hyperbolic transformation for vision correction
+    - Progressive appearance instead of periodic movement
+    """
+
+    def __init__(self, parameters: Dict[str, Any]):
+        """
+        Initialize the checkerboard stimulus generator.
+
+        Args:
+            parameters: The stimulus parameters
+        """
+        self.parameters = parameters
+
+        # Set up logging
+        self.logger = logging.getLogger("CheckerboardStimulus")
+
+        # Log if transformation is enabled
+        transformation = self.parameters.get("transformation", "none")
+        if transformation != "none":
+            self.logger.info(
+                "%s transformation enabled with eye radius: %s cm, distance: %s cm, strength: %s",
+                transformation.capitalize(),
+                self.parameters.get("eye_radius", 0.17),
+                self.parameters.get("eye_distance", 25.0),
+                self.parameters.get("correction_strength", 0.3),
+            )
+
+        # For backward compatibility, check spherical_correction boolean
+        if (
+            self.parameters.get("spherical_correction", False)
+            and transformation == "none"
+        ):
+            self.parameters["transformation"] = "spherical"
+            self.logger.info(
+                "Converting legacy spherical_correction=True to transformation='spherical'"
+            )
+
+        # Set default values for required parameters if not provided
+        if "refresh_rate" not in self.parameters:
+            self.parameters["refresh_rate"] = 60
+
+        # Check if GPU acceleration is available
+        self.use_gpu = False
+        self.gpu_type = None
+        self._check_gpu_capabilities()
+
+        # Calculated properties
+        self._calculate_derived_values()
+
+    def _check_gpu_capabilities(self):
+        """Check for available GPU acceleration capabilities."""
+        try:
+            import cv2
+
+            # Check for CUDA support
+            cuda_available = False
+            if hasattr(cv2, "cuda") and hasattr(cv2.cuda, "getCudaEnabledDeviceCount"):
+                cuda_devices = cv2.cuda.getCudaEnabledDeviceCount()
+                if cuda_devices > 0:
+                    cuda_available = True
+                    self.use_gpu = True
+                    self.gpu_type = "cuda"
+                    self.logger.info(
+                        f"CUDA GPU acceleration available with {cuda_devices} device(s)"
+                    )
+
+            # Check for OpenCL support
+            opencl_available = False
+            if hasattr(cv2, "ocl") and hasattr(cv2.ocl, "haveOpenCL"):
+                if cv2.ocl.haveOpenCL():
+                    cv2.ocl.setUseOpenCL(True)
+                    if cv2.ocl.useOpenCL():
+                        opencl_available = True
+                        self.use_gpu = True
+                        self.gpu_type = "opencl"
+                        self.logger.info("OpenCL GPU acceleration available")
+
+            # Check for Metal support on macOS
+            import platform
+
+            metal_available = False
+            if platform.system() == "Darwin":
+                try:
+                    import platform
+
+                    if (
+                        platform.processor() == "arm"
+                        or "Apple M" in platform.processor()
+                    ):
+                        metal_available = True
+                        self.use_gpu = True
+                        self.gpu_type = "metal"
+                        self.logger.info("Apple Metal GPU acceleration available")
+                except:
+                    pass
+
+            if not (cuda_available or opencl_available or metal_available):
+                self.logger.info("No GPU acceleration available, using CPU")
+
+        except Exception as e:
+            self.logger.warning(f"Error checking GPU capabilities: {e}")
+            self.use_gpu = False
+
+    def _calculate_derived_values(self):
+        """Calculate derived values based on current parameters."""
+        # Calculate pixels per degree (simple approximation)
+        # Use screen distance in cm
+        distance_cm = self.parameters.get("screen_distance", 25.0)
+
+        # For simplicity, assume 1920x1080 screen of width 50cm by default
+        # but use provided resolution if available
+        if "resolution" in self.parameters:
+            resolution = self.parameters["resolution"]
+            if isinstance(resolution, str) and "x" in resolution:
+                width_px, height_px = map(int, resolution.split("x"))
+            elif isinstance(resolution, (list, tuple)) and len(resolution) >= 2:
+                width_px, height_px = resolution[0], resolution[1]
+            else:
+                width_px, height_px = 1920, 1080
+        else:
+            width_px, height_px = 1920, 1080
+
+        # Store resolution for later use
+        self._resolution_width = width_px
+        self._resolution_height = height_px
+
+        # Screen physical size (default 50cm width)
+        width_cm = self.parameters.get("screen_width_cm", 50.0)
+
+        # Calculate pixels per cm
+        pixels_per_cm = width_px / width_cm
+
+        # Calculate pixels per degree
+        # At distance D, 1 degree spans approximately D*tan(1°) ≈ D*0.01745 cm
+        cm_per_degree = distance_cm * 0.01745
+        self._pixels_per_degree = pixels_per_cm * cm_per_degree
+
+        # Always use stretch mode to fill the entire screen
+        self._size_x_px = width_px
+        self._size_y_px = height_px
+
+        # Calculate sizes in degrees based on resolution
+        self._actual_x_size = width_px / self._pixels_per_degree
+        self._actual_y_size = height_px / self._pixels_per_degree
+
+        # Ensure dimensions are at least 1 pixel
+        self._size_x_px = max(1, self._size_x_px)
+        self._size_y_px = max(1, self._size_y_px)
+
+        # Calculate position in pixels (from center)
+        self._position_x_px = int(self.parameters["x_pos"] * self._pixels_per_degree)
+        self._position_y_px = int(self.parameters["y_pos"] * self._pixels_per_degree)
+
+        # Calculate total number of frames
+        refresh_rate = float(self.parameters["refresh_rate"])
+        self._total_frames = max(1, int(self.parameters["duration"] * refresh_rate))
+
+        # For checkerboard pattern, calculate cells and grid spacing
+        if self.parameters.get("pattern") == "checkerboard":
+            aspect_ratio = width_px / height_px
+
+            # Check if specific cell counts are provided
+            cells_x = self.parameters.get("cells_x", 0)
+            cells_y = self.parameters.get("cells_y", 0)
+            cell_ratio = self.parameters.get("cell_ratio", 1.0)
+
+            # Calculate default cell count if not specified
+            if cells_x <= 0 and cells_y <= 0:
+                # Use default approach based on resolution
+                if width_px > 2000:
+                    default_cells = 16  # For high-res displays
+                else:
+                    default_cells = 8  # For standard displays
+
+                # If transformation is enabled, increase the cell density
+                transformation = self.parameters.get("transformation", "none")
+                if transformation != "none":
+                    # Increase the cell count by 75% for transformations
+                    default_cells = int(default_cells * 1.75)
+                    self.logger.info(
+                        f"Increasing cell density for {transformation} transformation"
+                    )
+
+                # Set cells in x direction
+                cells_x = default_cells
+                # Apply cell ratio to determine y cells
+                cells_y = int(cells_x * cell_ratio)
+
+                self.logger.debug(f"Using automatic cell count: {cells_x}x{cells_y}")
+            elif cells_x > 0 and cells_y <= 0:
+                # X specified, calculate Y using ratio
+                cells_y = int(cells_x * cell_ratio)
+                self.logger.debug(
+                    f"Using specified cells_x={cells_x}, calculated cells_y={cells_y}"
+                )
+            elif cells_y > 0 and cells_x <= 0:
+                # Y specified, calculate X using ratio
+                cells_x = int(cells_y / cell_ratio)
+                self.logger.debug(
+                    f"Using specified cells_y={cells_y}, calculated cells_x={cells_x}"
+                )
+            else:
+                # Both specified
+                self.logger.debug(f"Using specified cell count: {cells_x}x{cells_y}")
+
+            # Calculate grid spacing from cell count
+            self.parameters["grid_spacing_x"] = self._actual_x_size / cells_x
+            self.parameters["grid_spacing_y"] = self._actual_y_size / cells_y
+
+            self.logger.info(
+                f"Grid setup: {cells_x}x{cells_y} cells, spacing={self.parameters['grid_spacing_x']:.2f}°x{self.parameters['grid_spacing_y']:.2f}°"
+            )
+
+        # Calculate grid spacing and line width in pixels
+        self._grid_spacing_x_px = int(
+            self.parameters["grid_spacing_x"] * self._pixels_per_degree
+        )
+        self._grid_spacing_y_px = int(
+            self.parameters["grid_spacing_y"] * self._pixels_per_degree
+        )
+        self._line_width_px = max(
+            1, int(self.parameters["line_width"] * self._pixels_per_degree)
+        )
+
+        # Ensure grid spacing is at least twice the line width
+        self._grid_spacing_x_px = max(self._grid_spacing_x_px, 2 * self._line_width_px)
+        self._grid_spacing_y_px = max(self._grid_spacing_y_px, 2 * self._line_width_px)
+
+    def _apply_transformation(self, x: float, y: float) -> Tuple[float, float]:
+        """
+        Apply coordinate transformation based on the selected transformation type.
+
+        Args:
+            x: x-coordinate in normalized range [-1, 1]
+            y: y-coordinate in normalized range [-1, 1]
+
+        Returns:
+            Tuple of transformed x, y coordinates
+        """
+        transformation = self.parameters.get("transformation", "none")
+        if transformation == "none":
+            return x, y
+
+        # Debug transformation only at log level debug
+        self.logger.debug(
+            f"Applying {transformation} transformation to coordinates: ({x:.3f}, {y:.3f})"
+        )
+
+        # Get parameters
+        eye_radius = self.parameters.get("eye_radius", 0.17)  # in cm
+        distance = self.parameters.get("eye_distance", 25.0)  # in cm
+        strength = self.parameters.get(
+            "correction_strength", 0.3
+        )  # correction strength
+
+        # Calculate distance from center (ensure we don't divide by zero)
+        length = np.sqrt(x**2 + y**2)
+        if length < 1e-10:  # Avoid division by zero
+            return x, y
+
+        if transformation == "spherical":
+            # Apply spherical (concave) transformation
+            # This pulls points toward the center based on their distance from the center
+            correction = strength * (length**2)
+            x_transformed = x * (1 - correction)
+            y_transformed = y * (1 - correction)
+
+        elif transformation == "hyperbolic":
+            # Apply hyperbolic (convex) transformation (bulge away effect)
+            correction = strength * (length**2)
+            # Use division instead of multiplication for proper bulge-away effect
+            scaling_factor = 1.0 / (1.0 + correction)
+            x_transformed = x * scaling_factor
+            y_transformed = y * scaling_factor
+
+        else:
+            # Unknown transformation type, return original coordinates
+            return x, y
+
+        self.logger.debug(
+            f"Transformed coordinates: ({x_transformed:.3f}, {y_transformed:.3f}), correction: {correction:.3f}"
+        )
+
+        return x_transformed, y_transformed
+
+    def _create_pattern_texture(self, phase_offset: float = 0.0) -> np.ndarray:
+        """
+        Create a checkerboard, grid, or bar pattern texture.
+
+        Args:
+            phase_offset: Phase offset for moving patterns (in degrees)
+
+        Returns:
+            np.ndarray: The texture as a numpy array
+        """
+        # Get parameters
+        pattern = self.parameters.get("pattern", "checkerboard")
+        contrast = self.parameters["contrast"] / 100.0
+        bg = self.parameters["background"] / 255.0
+        orientation_deg = self.parameters.get("orientation", 0.0)
+        progressive = self.parameters.get("progressive", False)
+        sweep_direction = self.parameters.get("sweep_direction", "left-to-right")
+        transformation = self.parameters.get("transformation", "none")
+        transformed_sweep = self.parameters.get("transformed_sweep", True)
+
+        # Verify if transformation is enabled
+        if hasattr(self, "logger") and transformation != "none":
+            self.logger.info(f"Applying {transformation} transformation to pattern")
+
+        # Create coordinate grid (in pixels)
+        y, x = np.mgrid[0 : self._size_y_px, 0 : self._size_x_px]
+
+        # Center coordinates
+        x = x - self._size_x_px // 2
+        y = y - self._size_y_px // 2
+
+        # Convert to degrees
+        x_deg = x / self._pixels_per_degree
+        y_deg = y / self._pixels_per_degree
+
+        # Store original coordinates for the transformed sweep
+        x_deg_orig = x_deg.copy()
+        y_deg_orig = y_deg.copy()
+
+        # Apply transformation if enabled
+        if transformation != "none":
+            # Apply correction to each point (vectorized)
+            # First, create meshgrids of corrected coordinates
+            corrected_coords = np.vectorize(self._apply_transformation)(x_deg, y_deg)
+            x_deg = corrected_coords[0]
+            y_deg = corrected_coords[1]
+
+        # Rotate coordinates if needed
+        if orientation_deg != 0:
+            orientation_rad = np.radians(orientation_deg)
+            x_rot = x_deg * np.cos(orientation_rad) - y_deg * np.sin(orientation_rad)
+            y_rot = x_deg * np.sin(orientation_rad) + y_deg * np.cos(orientation_rad)
+            x_deg, y_deg = x_rot, y_rot
+
+        # Apply phase offset (for moving patterns)
+        if not progressive:
+            # For periodic movement, shift the pattern by the phase
+            phase_rad = np.radians(phase_offset)
+            offset_px = phase_rad / (2 * np.pi) * self._grid_spacing_x_px
+            x_deg = x_deg + offset_px / self._pixels_per_degree
+
+        # Create the pattern (checkerboard, grid, or bar)
+        pattern_img = np.ones((self._size_y_px, self._size_x_px))
+
+        if pattern == "grid":
+            # Create grid pattern
+            # X grid lines
+            x_grid = (
+                np.abs(
+                    np.mod(
+                        x_deg + self._grid_spacing_x_px / (2 * self._pixels_per_degree),
+                        self.parameters["grid_spacing_x"],
+                    )
+                    - self.parameters["grid_spacing_x"] / 2
+                )
+                < self.parameters["line_width"] / 2
+            )
+
+            # Y grid lines
+            y_grid = (
+                np.abs(
+                    np.mod(
+                        y_deg + self._grid_spacing_y_px / (2 * self._pixels_per_degree),
+                        self.parameters["grid_spacing_y"],
+                    )
+                    - self.parameters["grid_spacing_y"] / 2
+                )
+                < self.parameters["line_width"] / 2
+            )
+
+            # Combine X and Y grid lines
+            pattern_img = np.where(x_grid | y_grid, 1.0, 0.0)
+
+        elif pattern == "checkerboard":
+            # Create checkerboard pattern using modulo operation on grid coordinates
+            x_check = np.floor(
+                np.mod(x_deg / self.parameters["grid_spacing_x"], 1.0) * 2
+            )
+            y_check = np.floor(
+                np.mod(y_deg / self.parameters["grid_spacing_y"], 1.0) * 2
+            )
+
+            # XOR operation: cells are white where x_check and y_check have the same parity
+            pattern_img = np.mod(x_check + y_check, 2)
+            pattern_img = np.where(pattern_img, 1.0, 0.0)
+
+        else:  # pattern == 'bars'
+            # Create bar pattern
+            pattern_img = (
+                np.abs(
+                    np.mod(
+                        x_deg + self._grid_spacing_x_px / (2 * self._pixels_per_degree),
+                        self.parameters["grid_spacing_x"],
+                    )
+                    - self.parameters["grid_spacing_x"] / 2
+                )
+                < self.parameters["line_width"] / 2
+            )
+            pattern_img = np.where(pattern_img, 1.0, 0.0)
+
+        # Apply progressive appearance if enabled
+        if progressive:
+            progress = phase_offset / 360.0
+            mask = np.zeros((self._size_y_px, self._size_x_px), dtype=np.uint8)
+
+            # Check if transformed sweep is enabled
+            transformed_sweep = self.parameters.get("transformed_sweep", True)
+
+            # Initialize sweep_pos
+            sweep_pos = 0
+
+            if transformed_sweep and transformation != "none":
+                # Get original normalized coordinates for comparison
+                x_norm = x_deg_orig / (self._actual_x_size / 2)  # Range [-1, 1]
+                y_norm = y_deg_orig / (self._actual_y_size / 2)  # Range [-1, 1]
+
+                if sweep_direction == "left-to-right":
+                    # Calculate sweep plane position in normalized space
+                    sweep_pos = -1.0 + progress * 2.0  # From -1 to 1
+                    # Points are visible if they're to the left of the sweep plane
+                    mask = np.where(x_norm <= sweep_pos, 1.0, 0.0)
+                    # Convert to uint8 for bitwise operation
+                    mask_uint8 = (mask * 255).astype(np.uint8)
+
+                elif sweep_direction == "right-to-left":
+                    # Calculate sweep plane position in normalized space
+                    sweep_pos = 1.0 - progress * 2.0  # From 1 to -1
+                    # Points are visible if they're to the right of the sweep plane
+                    mask = np.where(x_norm >= sweep_pos, 1.0, 0.0)
+                    # Convert to uint8 for bitwise operation
+                    mask_uint8 = (mask * 255).astype(np.uint8)
+
+                elif sweep_direction == "top-to-bottom":
+                    # Calculate sweep plane position in normalized space
+                    sweep_pos = -1.0 + progress * 2.0  # From -1 to 1
+                    # Points are visible if they're above the sweep plane
+                    mask = np.where(y_norm <= sweep_pos, 1.0, 0.0)
+                    # Convert to uint8 for bitwise operation
+                    mask_uint8 = (mask * 255).astype(np.uint8)
+
+                elif sweep_direction == "bottom-to-top":
+                    # Calculate sweep plane position in normalized space
+                    sweep_pos = 1.0 - progress * 2.0  # From 1 to -1
+                    # Points are visible if they're below the sweep plane
+                    mask = np.where(y_norm >= sweep_pos, 1.0, 0.0)
+                    # Convert to uint8 for bitwise operation
+                    mask_uint8 = (mask * 255).astype(np.uint8)
+
+                self.logger.debug(
+                    f"Using transformed sweep at position {sweep_pos:.2f}"
+                )
+
+            else:
+                # Standard straight-line sweep
+                if sweep_direction == "left-to-right":
+                    sweep_pos = int(progress * self._size_x_px)
+                    mask[:, :sweep_pos] = 1.0
+                elif sweep_direction == "right-to-left":
+                    sweep_pos = int((1 - progress) * self._size_x_px)
+                    mask[:, sweep_pos:] = 1.0
+                elif sweep_direction == "top-to-bottom":
+                    sweep_pos = int(progress * self._size_y_px)
+                    mask[:sweep_pos, :] = 1.0
+                elif sweep_direction == "bottom-to-top":
+                    sweep_pos = int((1 - progress) * self._size_y_px)
+                    mask[sweep_pos:, :] = 1.0
+
+                # Convert to uint8 for bitwise operation
+                mask_uint8 = (mask * 255).astype(np.uint8)
+
+            checker = cv2.bitwise_and(pattern_img, mask_uint8)
+
+        # Apply contrast and shift to range [0, 1]
+        pattern_img = bg + (2 * contrast * (checker - 0.5))
+
+        # Apply mask if needed
+        mask_type = self.parameters.get("mask_type", "none")
+        if mask_type != "none":
+            # Distance from center for each pixel
+            distance = np.sqrt(x**2 + y**2)
+
+            # Convert mask radius to pixels
+            mask_radius_px = self.parameters["mask_radius"] * self._pixels_per_degree
+
+            if mask_type == "circle":
+                # Circle mask (1 inside radius, 0 outside)
+                mask = np.where(distance <= mask_radius_px, 1.0, 0.0)
+
+            elif mask_type == "gaussian":
+                # Gaussian mask
+                sigma_px = self.parameters["mask_sigma"] * self._pixels_per_degree
+                mask = np.exp(-(distance**2) / (2 * sigma_px**2))
+            else:
+                # Fall back to no mask
+                mask = np.ones_like(pattern_img)
+
+            # Apply the mask
+            pattern_img = pattern_img * mask + (1 - mask) * bg
+
+        # Convert to 8-bit (0-255) for display
+        pattern_8bit = np.clip(pattern_img * 255, 0, 255).astype(np.uint8)
+
+        return pattern_8bit
+
+    def _create_checkerboard_texture_gpu(
+        self,
+        phase_offset: float,
+        contrast: float,
+        bg: float,
+        orientation_deg: float,
+        progressive: bool,
+        sweep_direction: str,
+    ) -> np.ndarray:
+        """
+        Create a checkerboard pattern texture using GPU acceleration.
+
+        Args:
+            phase_offset: Phase offset for moving patterns (in degrees)
+            contrast: Contrast value (0-1)
+            bg: Background value (0-1)
+            orientation_deg: Orientation in degrees
+            progressive: Whether to use progressive appearance
+            sweep_direction: Direction for progressive sweep
+
+        Returns:
+            np.ndarray: The texture as a numpy array
+        """
+        import cv2
+        import numpy as np
+
+        # Check if transformation is enabled - define this at the top for all code paths
+        transformation = self.parameters.get("transformation", "none")
+
+        # Different approaches based on available GPU acceleration
+        if self.gpu_type == "cuda":
+            # Use CUDA for checkerboard generation
+            try:
+                # Check if CUDA is available
+                if not hasattr(cv2, "cuda"):
+                    self.logger.warning(
+                        "CUDA module not available, falling back to CPU"
+                    )
+                    return self._create_pattern_texture(phase_offset)
+
+                # Check if CUDA device is available
+                if (
+                    not hasattr(cv2.cuda, "getCudaEnabledDeviceCount")
+                    or cv2.cuda.getCudaEnabledDeviceCount() == 0
+                ):
+                    self.logger.warning(
+                        "No CUDA devices available, falling back to CPU"
+                    )
+                    return self._create_pattern_texture(phase_offset)
+
+                # Initialize transformation maps
+                map_x = None
+                map_y = None
+
+                # Create coordinate grid for transformation if needed
+                if transformation != "none":
+                    # Create coordinate grid (in pixels)
+                    y, x = np.mgrid[0 : self._size_y_px, 0 : self._size_x_px]
+
+                    # Center coordinates and normalize to range [-1, 1]
+                    x = (x - self._size_x_px // 2) / (self._size_x_px // 2)
+                    y = (y - self._size_y_px // 2) / (self._size_y_px // 2)
+
+                    # Calculate distance from center
+                    distance = np.sqrt(x**2 + y**2)
+
+                    # Get the correction strength
+                    strength = self.parameters.get("correction_strength", 0.3)
+
+                    # Apply appropriate transformation
+                    if transformation == "spherical":
+                        # Apply concave spherical transformation
+                        correction = strength * distance**2
+                        x_transformed = x * (1 - correction)
+                        y_transformed = y * (1 - correction)
+                    elif transformation == "hyperbolic":
+                        # Apply convex hyperbolic transformation (bulge away effect)
+                        correction = strength * distance**2
+                        # Use division instead of multiplication for proper bulge-away effect
+                        scaling_factor = 1.0 / (1.0 + correction)
+                        x_transformed = x * scaling_factor
+                        y_transformed = y * scaling_factor
+                    else:
+                        # No transformation
+                        x_transformed, y_transformed = x, y
+
+                    # Convert back to pixel coordinates
+                    x_map = (x_transformed + 1) * (self._size_x_px // 2)
+                    y_map = (y_transformed + 1) * (self._size_y_px // 2)
+
+                    # Create the transformation map for OpenCV remap
+                    map_x = x_map.astype(np.float32)
+                    map_y = y_map.astype(np.float32)
+
+                # Create checkerboard pattern
+                cell_size_x = int(
+                    self.parameters["grid_spacing_x"] * self._pixels_per_degree
+                )
+                cell_size_y = int(
+                    self.parameters["grid_spacing_y"] * self._pixels_per_degree
+                )
+
+                # Ensure minimum cell size
+                cell_size_x = max(cell_size_x, 2)
+                cell_size_y = max(cell_size_y, 2)
+
+                # Create a checkerboard pattern
+                checker = np.zeros((self._size_y_px, self._size_x_px), dtype=np.uint8)
+                for y in range(self._size_y_px):
+                    for x in range(self._size_x_px):
+                        cell_x = x // cell_size_x
+                        cell_y = y // cell_size_y
+                        checker[y, x] = 255 if (cell_x + cell_y) % 2 == 0 else 0
+
+                # Upload to GPU
+                if not hasattr(cv2.cuda, "GpuMat"):
+                    self.logger.warning(
+                        "CUDA GpuMat not available, falling back to CPU"
+                    )
+                    return self._create_pattern_texture(phase_offset)
+
+                gpu_checker = cv2.cuda.GpuMat()
+                gpu_checker.upload(checker)
+
+                # Apply rotation if needed
+                if orientation_deg != 0:
+                    # Get rotation matrix
+                    center = (self._size_x_px // 2, self._size_y_px // 2)
+                    rotation_matrix = cv2.getRotationMatrix2D(
+                        center, orientation_deg, 1.0
+                    )
+
+                    # Do rotation on CPU (OpenCV CUDA doesn't have warpAffine)
+                    checker = gpu_checker.download()
+                    checker = cv2.warpAffine(
+                        checker,
+                        rotation_matrix,
+                        (self._size_x_px, self._size_y_px),
+                        borderMode=cv2.BORDER_REPLICATE,
+                    )
+                    gpu_checker = cv2.cuda.GpuMat()
+                    gpu_checker.upload(checker)
+
+                # Apply transformation if enabled
+                if transformation != "none" and map_x is not None and map_y is not None:
+                    # Download from GPU for remapping (CUDA doesn't have remap)
+                    checker = gpu_checker.download()
+                    # Use OpenCV's remap function to apply the transformation
+                    checker = cv2.remap(
+                        checker,
+                        map_x,
+                        map_y,
+                        cv2.INTER_LINEAR,
+                        borderMode=cv2.BORDER_REPLICATE,
+                    )
+                    # Upload back to GPU
+                    gpu_checker = cv2.cuda.GpuMat()
+                    gpu_checker.upload(checker)
+
+                # Apply progressive appearance if enabled
+                if progressive:
+                    progress = phase_offset / 360.0
+                    mask = np.zeros((self._size_y_px, self._size_x_px), dtype=np.uint8)
+
+                    # Check if transformed sweep is enabled
+                    transformed_sweep = self.parameters.get("transformed_sweep", True)
+
+                    # Initialize sweep_pos
+                    sweep_pos = 0
+
+                    if transformed_sweep and transformation != "none":
+                        # Store original coordinates before transformation
+                        y_orig, x_orig = np.mgrid[
+                            0 : self._size_y_px, 0 : self._size_x_px
+                        ]
+
+                        # Center and normalize to range [-1, 1]
+                        x_norm = (x_orig - self._size_x_px // 2) / (
+                            self._size_x_px // 2
+                        )
+                        y_norm = (y_orig - self._size_y_px // 2) / (
+                            self._size_y_px // 2
+                        )
+
+                        if sweep_direction == "left-to-right":
+                            # Calculate sweep plane position in normalized space
+                            sweep_pos = -1.0 + progress * 2.0  # From -1 to 1
+                            # Points are visible if they're to the left of the sweep plane
+                            mask = np.where(x_norm <= sweep_pos, 255, 0).astype(
+                                np.uint8
+                            )
+
+                        elif sweep_direction == "right-to-left":
+                            # Calculate sweep plane position in normalized space
+                            sweep_pos = 1.0 - progress * 2.0  # From 1 to -1
+                            # Points are visible if they're to the right of the sweep plane
+                            mask = np.where(x_norm >= sweep_pos, 255, 0).astype(
+                                np.uint8
+                            )
+
+                        elif sweep_direction == "top-to-bottom":
+                            # Calculate sweep plane position in normalized space
+                            sweep_pos = -1.0 + progress * 2.0  # From -1 to 1
+                            # Points are visible if they're above the sweep plane
+                            mask = np.where(y_norm <= sweep_pos, 255, 0).astype(
+                                np.uint8
+                            )
+
+                        elif sweep_direction == "bottom-to-top":
+                            # Calculate sweep plane position in normalized space
+                            sweep_pos = 1.0 - progress * 2.0  # From 1 to -1
+                            # Points are visible if they're below the sweep plane
+                            mask = np.where(y_norm >= sweep_pos, 255, 0).astype(
+                                np.uint8
+                            )
+
+                        self.logger.debug(
+                            f"Using transformed sweep at position {sweep_pos:.2f}"
+                        )
+                    else:
+                        # Standard straight-line sweep
+                        if sweep_direction == "left-to-right":
+                            sweep_pos = int(progress * self._size_x_px)
+                            mask[:, :sweep_pos] = 255
+                        elif sweep_direction == "right-to-left":
+                            sweep_pos = int((1 - progress) * self._size_x_px)
+                            mask[:, sweep_pos:] = 255
+                        elif sweep_direction == "top-to-bottom":
+                            sweep_pos = int(progress * self._size_y_px)
+                            mask[:sweep_pos, :] = 255
+                        elif sweep_direction == "bottom-to-top":
+                            sweep_pos = int((1 - progress) * self._size_y_px)
+                            mask[sweep_pos:, :] = 255
+
+                    checker = cv2.bitwise_and(checker, mask)
+
+                # Download result from GPU
+                checker = gpu_checker.download()
+
+                # Apply contrast and background
+                checker = checker.astype(np.float32) / 255.0
+                checker = bg + (2 * contrast * (checker - 0.5))
+                checker = np.clip(checker * 255, 0, 255).astype(np.uint8)
+
+                # Return the clean pattern without debug information or borders
+                return checker
+
+            except Exception as e:
+                # Fall back to CPU if CUDA operations fail
+                self.logger.warning(f"CUDA operation failed: {e}")
+                return self._create_pattern_texture(phase_offset)
+
+        elif self.gpu_type == "metal":
+            # Use Metal for checkerboard generation (Apple-specific)
+            try:
+                # Initialize transformation maps
+                map_x = None
+                map_y = None
+
+                # Create coordinate grid for transformation if needed
+                if transformation != "none":
+                    # Create coordinate grid (in pixels)
+                    y, x = np.mgrid[0 : self._size_y_px, 0 : self._size_x_px]
+
+                    # Center coordinates and normalize to range [-1, 1]
+                    x = (x - self._size_x_px // 2) / (self._size_x_px // 2)
+                    y = (y - self._size_y_px // 2) / (self._size_y_px // 2)
+
+                    # Calculate distance from center
+                    distance = np.sqrt(x**2 + y**2)
+
+                    # Get the correction strength
+                    strength = self.parameters.get("correction_strength", 0.3)
+
+                    # Apply appropriate transformation
+                    if transformation == "spherical":
+                        # Apply concave spherical transformation
+                        correction = strength * distance**2
+                        x_transformed = x * (1 - correction)
+                        y_transformed = y * (1 - correction)
+                    elif transformation == "hyperbolic":
+                        # Apply convex hyperbolic transformation (bulge away effect)
+                        correction = strength * distance**2
+                        # Use division instead of multiplication for proper bulge-away effect
+                        scaling_factor = 1.0 / (1.0 + correction)
+                        x_transformed = x * scaling_factor
+                        y_transformed = y * scaling_factor
+                    else:
+                        # No transformation
+                        x_transformed, y_transformed = x, y
+
+                    # Convert back to pixel coordinates
+                    x_map = (x_transformed + 1) * (self._size_x_px // 2)
+                    y_map = (y_transformed + 1) * (self._size_y_px // 2)
+
+                    # Create the transformation map for OpenCV remap
+                    map_x = x_map.astype(np.float32)
+                    map_y = y_map.astype(np.float32)
+
+                # Create a base checkerboard pattern on CPU
+                cell_size_x = int(
+                    self.parameters["grid_spacing_x"] * self._pixels_per_degree
+                )
+                cell_size_y = int(
+                    self.parameters["grid_spacing_y"] * self._pixels_per_degree
+                )
+
+                # Create checkerboard pattern
+                checker = np.zeros((self._size_y_px, self._size_x_px), dtype=np.uint8)
+                for y in range(self._size_y_px):
+                    for x in range(self._size_x_px):
+                        cell_x = x // cell_size_x
+                        cell_y = y // cell_size_y
+                        checker[y, x] = 255 if (cell_x + cell_y) % 2 == 0 else 0
+
+                # Apply rotation if needed
+                if orientation_deg != 0:
+                    center = (self._size_x_px // 2, self._size_y_px // 2)
+                    rotation_matrix = cv2.getRotationMatrix2D(
+                        center, orientation_deg, 1.0
+                    )
+                    checker = cv2.warpAffine(
+                        checker,
+                        rotation_matrix,
+                        (self._size_x_px, self._size_y_px),
+                        borderMode=cv2.BORDER_REPLICATE,
+                    )
+
+                # Apply transformation if enabled
+                if transformation != "none" and map_x is not None and map_y is not None:
+                    # Use OpenCV's remap function to apply the transformation
+                    checker = cv2.remap(
+                        checker,
+                        map_x,
+                        map_y,
+                        cv2.INTER_LINEAR,
+                        borderMode=cv2.BORDER_REPLICATE,
+                    )
+
+                # Apply progressive appearance if enabled
+                if progressive:
+                    progress = phase_offset / 360.0
+                    mask = np.zeros((self._size_y_px, self._size_x_px), dtype=np.uint8)
+
+                    # Check if transformed sweep is enabled
+                    transformed_sweep = self.parameters.get("transformed_sweep", True)
+
+                    # Initialize sweep_pos
+                    sweep_pos = 0
+
+                    if transformed_sweep and transformation != "none":
+                        # Store original coordinates before transformation
+                        y_orig, x_orig = np.mgrid[
+                            0 : self._size_y_px, 0 : self._size_x_px
+                        ]
+
+                        # Center and normalize to range [-1, 1]
+                        x_norm = (x_orig - self._size_x_px // 2) / (
+                            self._size_x_px // 2
+                        )
+                        y_norm = (y_orig - self._size_y_px // 2) / (
+                            self._size_y_px // 2
+                        )
+
+                        if sweep_direction == "left-to-right":
+                            # Calculate sweep plane position in normalized space
+                            sweep_pos = -1.0 + progress * 2.0  # From -1 to 1
+                            # Points are visible if they're to the left of the sweep plane
+                            mask = np.where(x_norm <= sweep_pos, 255, 0).astype(
+                                np.uint8
+                            )
+
+                        elif sweep_direction == "right-to-left":
+                            # Calculate sweep plane position in normalized space
+                            sweep_pos = 1.0 - progress * 2.0  # From 1 to -1
+                            # Points are visible if they're to the right of the sweep plane
+                            mask = np.where(x_norm >= sweep_pos, 255, 0).astype(
+                                np.uint8
+                            )
+
+                        elif sweep_direction == "top-to-bottom":
+                            # Calculate sweep plane position in normalized space
+                            sweep_pos = -1.0 + progress * 2.0  # From -1 to 1
+                            # Points are visible if they're above the sweep plane
+                            mask = np.where(y_norm <= sweep_pos, 255, 0).astype(
+                                np.uint8
+                            )
+
+                        elif sweep_direction == "bottom-to-top":
+                            # Calculate sweep plane position in normalized space
+                            sweep_pos = 1.0 - progress * 2.0  # From 1 to -1
+                            # Points are visible if they're below the sweep plane
+                            mask = np.where(y_norm >= sweep_pos, 255, 0).astype(
+                                np.uint8
+                            )
+
+                        self.logger.debug(
+                            f"Using transformed sweep at position {sweep_pos:.2f}"
+                        )
+                    else:
+                        # Standard straight-line sweep
+                        if sweep_direction == "left-to-right":
+                            sweep_pos = int(progress * self._size_x_px)
+                            mask[:, :sweep_pos] = 255
+                        elif sweep_direction == "right-to-left":
+                            sweep_pos = int((1 - progress) * self._size_x_px)
+                            mask[:, sweep_pos:] = 255
+                        elif sweep_direction == "top-to-bottom":
+                            sweep_pos = int(progress * self._size_y_px)
+                            mask[:sweep_pos, :] = 255
+                        elif sweep_direction == "bottom-to-top":
+                            sweep_pos = int((1 - progress) * self._size_y_px)
+                            mask[sweep_pos:, :] = 255
+
+                    checker = cv2.bitwise_and(checker, mask)
+
+                # Apply contrast and background
+                checker = checker.astype(np.float32) / 255.0
+                checker = bg + (2 * contrast * (checker - 0.5))
+                checker = np.clip(checker * 255, 0, 255).astype(np.uint8)
+
+                return checker
+
+            except Exception as e:
+                # Fall back to CPU if Metal operations fail
+                self.logger.warning(f"Metal operation failed: {e}")
+                return self._create_pattern_texture(phase_offset)
+
+        elif self.gpu_type == "opencl":
+            # Use OpenCL for checkerboard generation
+            try:
+                # Enable OpenCL
+                cv2.ocl.setUseOpenCL(True)
+
+                if not cv2.ocl.useOpenCL():
+                    self.logger.warning("OpenCL not enabled, falling back to CPU")
+                    return self._create_pattern_texture(phase_offset)
+
+                # Initialize transformation maps
+                map_x = None
+                map_y = None
+
+                # Create coordinate grid for transformation if needed
+                if transformation != "none":
+                    # Create coordinate grid (in pixels)
+                    y, x = np.mgrid[0 : self._size_y_px, 0 : self._size_x_px]
+
+                    # Center coordinates and normalize to range [-1, 1]
+                    x = (x - self._size_x_px // 2) / (self._size_x_px // 2)
+                    y = (y - self._size_y_px // 2) / (self._size_y_px // 2)
+
+                    # Calculate distance from center
+                    distance = np.sqrt(x**2 + y**2)
+
+                    # Get the correction strength
+                    strength = self.parameters.get("correction_strength", 0.3)
+
+                    # Apply appropriate transformation
+                    if transformation == "spherical":
+                        # Apply concave spherical transformation
+                        correction = strength * distance**2
+                        x_transformed = x * (1 - correction)
+                        y_transformed = y * (1 - correction)
+                    elif transformation == "hyperbolic":
+                        # Apply convex hyperbolic transformation (bulge away effect)
+                        correction = strength * distance**2
+                        # Use division instead of multiplication for proper bulge-away effect
+                        scaling_factor = 1.0 / (1.0 + correction)
+                        x_transformed = x * scaling_factor
+                        y_transformed = y * scaling_factor
+                    else:
+                        # No transformation
+                        x_transformed, y_transformed = x, y
+
+                    # Convert back to pixel coordinates
+                    x_map = (x_transformed + 1) * (self._size_x_px // 2)
+                    y_map = (y_transformed + 1) * (self._size_y_px // 2)
+
+                    # Create the transformation map for OpenCV remap
+                    map_x = x_map.astype(np.float32)
+                    map_y = y_map.astype(np.float32)
+
+                # Create cell sizes
+                cell_size_x = int(
+                    self.parameters["grid_spacing_x"] * self._pixels_per_degree
+                )
+                cell_size_y = int(
+                    self.parameters["grid_spacing_y"] * self._pixels_per_degree
+                )
+
+                # Create checkerboard pattern on CPU first
+                checker = np.zeros((self._size_y_px, self._size_x_px), dtype=np.uint8)
+                for y in range(self._size_y_px):
+                    for x in range(self._size_x_px):
+                        cell_x = x // cell_size_x
+                        cell_y = y // cell_size_y
+                        checker[y, x] = 255 if (cell_x + cell_y) % 2 == 0 else 0
+
+                # Apply rotation if needed
+                if orientation_deg != 0:
+                    center = (self._size_x_px // 2, self._size_y_px // 2)
+                    rotation_matrix = cv2.getRotationMatrix2D(
+                        center, orientation_deg, 1.0
+                    )
+                    checker = cv2.warpAffine(
+                        checker,
+                        rotation_matrix,
+                        (self._size_x_px, self._size_y_px),
+                        borderMode=cv2.BORDER_REPLICATE,
+                    )
+
+                # Apply transformation if enabled
+                if transformation != "none" and map_x is not None and map_y is not None:
+                    # Use OpenCV's remap function with built-in OpenCL acceleration
+                    checker = cv2.remap(
+                        checker,
+                        map_x,
+                        map_y,
+                        cv2.INTER_LINEAR,
+                        borderMode=cv2.BORDER_REPLICATE,
+                    )
+
+                # Apply progressive appearance if enabled
+                if progressive:
+                    progress = phase_offset / 360.0
+                    mask = np.zeros((self._size_y_px, self._size_x_px), dtype=np.uint8)
+
+                    # Check if transformed sweep is enabled
+                    transformed_sweep = self.parameters.get("transformed_sweep", True)
+
+                    # Initialize sweep_pos
+                    sweep_pos = 0
+
+                    if transformed_sweep and transformation != "none":
+                        # Store original coordinates before transformation
+                        y_orig, x_orig = np.mgrid[
+                            0 : self._size_y_px, 0 : self._size_x_px
+                        ]
+
+                        # Center and normalize to range [-1, 1]
+                        x_norm = (x_orig - self._size_x_px // 2) / (
+                            self._size_x_px // 2
+                        )
+                        y_norm = (y_orig - self._size_y_px // 2) / (
+                            self._size_y_px // 2
+                        )
+
+                        if sweep_direction == "left-to-right":
+                            # Calculate sweep plane position in normalized space
+                            sweep_pos = -1.0 + progress * 2.0  # From -1 to 1
+                            # Points are visible if they're to the left of the sweep plane
+                            mask = np.where(x_norm <= sweep_pos, 1.0, 0.0)
+                            # Convert to uint8 for bitwise operation
+                            mask_uint8 = (mask * 255).astype(np.uint8)
+
+                        elif sweep_direction == "right-to-left":
+                            # Calculate sweep plane position in normalized space
+                            sweep_pos = 1.0 - progress * 2.0  # From 1 to -1
+                            # Points are visible if they're to the right of the sweep plane
+                            mask = np.where(x_norm >= sweep_pos, 1.0, 0.0)
+                            # Convert to uint8 for bitwise operation
+                            mask_uint8 = (mask * 255).astype(np.uint8)
+
+                        self.logger.debug(
+                            f"Using transformed sweep at position {sweep_pos:.2f}"
+                        )
+                    else:
+                        # Standard straight-line sweep
+                        if sweep_direction == "left-to-right":
+                            sweep_pos = int(progress * self._size_x_px)
+                            mask[:, :sweep_pos] = 1.0
+                        elif sweep_direction == "right-to-left":
+                            sweep_pos = int((1 - progress) * self._size_x_px)
+                            mask[:, sweep_pos:] = 1.0
+                        elif sweep_direction == "top-to-bottom":
+                            sweep_pos = int(progress * self._size_y_px)
+                            mask[:sweep_pos, :] = 1.0
+                        elif sweep_direction == "bottom-to-top":
+                            sweep_pos = int((1 - progress) * self._size_y_px)
+                            mask[sweep_pos:, :] = 1.0
+
+                        # Convert to uint8 for bitwise operation
+                        mask_uint8 = (mask * 255).astype(np.uint8)
