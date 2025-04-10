@@ -30,8 +30,8 @@ def create_composite_view():
         "bar_width": 20.0,  # Exactly 20° as in MMC1
         "grid_spacing_x": 25.0,  # Exactly 25° as in MMC1
         "grid_spacing_y": 25.0,  # Exactly 25° as in MMC1
-        "drift_speed": 15.0,  # faster for testing
-        "temporal_freq": 6.0,
+        "drift_speed": 9.0,  # Exactly 9° per second as requested
+        "temporal_freq": 6.0,  # 6Hz counterphase frequency
         "screen_distance": 10.0,
         "screen_angle": 20.0,
         "horizontal_meridian_offset": 0.0,  # Set to 0 for visualization to match grid
@@ -53,6 +53,14 @@ def create_composite_view():
     azimuth_min, azimuth_max = -x_size / 2, x_size / 2
     altitude_min, altitude_max = -y_size / 2, y_size / 2
 
+    # Calculate extent for the plots
+    extent = (
+        float(azimuth_min),
+        float(azimuth_max),
+        float(altitude_min),
+        float(altitude_max),
+    )
+
     # Create grid lines at exactly 25-degree intervals to match the checkerboard pattern
     azimuth_lines = np.arange(
         np.ceil(azimuth_min / checker_size_x) * checker_size_x,
@@ -65,17 +73,6 @@ def create_composite_view():
         np.floor(altitude_max / checker_size_y) * checker_size_y + 1,
         checker_size_y,
     )
-
-    # Create figure with 2 rows (directions) and 5 columns (selected frames)
-    # Use the pixel ratio for the figure to match the video output
-    fig_width = 20
-    fig_height = fig_width / pixel_aspect_ratio * 2 / 5  # Adjust for 2 rows, 5 cols
-    fig, axs = plt.subplots(2, 5, figsize=(fig_width, fig_height))
-    fig.suptitle("Drifting Bar with Spherical Correction", fontsize=16)
-
-    # Create a DriftingBarStimulus for each direction
-    direction_stimuli: Dict[str, DriftingBarStimulus] = {}
-    directions = ["left-to-right", "bottom-to-top"]
 
     # Create a SphericalCorrection instance for generating transformed coordinates
     spherical_correction = SphericalCorrection(params)
@@ -167,6 +164,10 @@ def create_composite_view():
 
         return x_pixels, y_pixels
 
+    # Create DriftingBarStimulus instances for each direction
+    direction_stimuli: Dict[str, DriftingBarStimulus] = {}
+    directions = ["left-to-right", "bottom-to-top"]
+
     for direction in directions:
         # Create a separate stimulus instance for each direction to ensure proper setup
         direction_params = params.copy()
@@ -187,227 +188,252 @@ def create_composite_view():
         v_pos = -y_size / 2 - bar_width + progress * (y_size + 2 * bar_width)
         vertical_angles.append(v_pos)
 
-    # Generate frames for each direction and progress point
-    for row, direction in enumerate(directions):
-        # Get the stimulus for this direction
-        stimulus = direction_stimuli[direction]
+    # Function to create a figure with the specified frames
+    def create_figure(use_overlays=False):
+        # Create figure with 2 rows (directions) and 5 columns (selected frames)
+        # Use the pixel ratio for the figure to match the video output
+        fig_width = 20
+        fig_height = fig_width / pixel_aspect_ratio * 2 / 5  # Adjust for 2 rows, 5 cols
+        fig, axs = plt.subplots(2, 5, figsize=(fig_width, fig_height))
 
-        # Update the spherical correction parameters to match
-        spherical_correction.parameters["sweep_direction"] = direction
-        spherical_correction.parameters["correct_axis"] = (
-            "azimuth" if direction in ["left-to-right", "right-to-left"] else "altitude"
+        # Set the figure title
+        mode = "Debug View (with Grid Overlay)" if use_overlays else "Black and White"
+        fig.suptitle(f"Drifting Bar with Spherical Correction - {mode}", fontsize=16)
+
+        # Generate frames for each direction and progress point
+        for row, direction in enumerate(directions):
+            # Get the stimulus for this direction
+            stimulus = direction_stimuli[direction]
+
+            # Update the spherical correction parameters to match
+            spherical_correction.parameters["sweep_direction"] = direction
+            spherical_correction.parameters["correct_axis"] = (
+                "azimuth"
+                if direction in ["left-to-right", "right-to-left"]
+                else "altitude"
+            )
+            spherical_correction.parameters["width"] = width
+            spherical_correction.parameters["height"] = height
+
+            # Create transformation maps for this direction
+            map_x, map_y = spherical_correction.create_transformation_maps(
+                width, height
+            )
+
+            for col, progress in enumerate(progress_points):
+                # Calculate frame index from progress
+                frame_idx = int(progress * (stimulus.frame_count - 1))
+
+                # Generate the frame with properly transformed bar
+                frame = stimulus.get_frame(frame_idx)
+
+                # Get current bar position
+                if direction == "left-to-right":
+                    bar_pos = horizontal_angles[col]
+                else:
+                    bar_pos = vertical_angles[col]
+
+                # If overlay mode, create grid and bar outlines
+                if use_overlays:
+                    # Convert to RGB for drawing colored lines
+                    frame_rgb = cv2.cvtColor(frame.copy(), cv2.COLOR_GRAY2RGB)
+
+                    # Create separate images for grid and bar outline
+                    grid_img = np.zeros((height, width, 3), dtype=np.uint8)
+                    bar_img = np.zeros((height, width, 3), dtype=np.uint8)
+
+                    # Create a full coordinate grid for the entire frame
+                    y_coords, x_coords = np.mgrid[0:height, 0:width]
+                    x_norm = x_coords / (width / 2) - 1.0
+                    y_norm = y_coords / (height / 2) - 1.0
+
+                    # Convert to visual degrees
+                    x_deg = x_norm * (x_size / 2)
+                    y_deg = y_norm * (y_size / 2)
+
+                    # Transform to get spherical coordinates (phi and theta)
+                    phi_deg, theta_deg = apply_exact_spherical_transform(x_deg, y_deg)
+
+                    # Calculate the visual center of the screen in spherical coordinates
+                    screen_center_y = height // 2
+
+                    # Draw a horizontal line at the exact center of the screen as the equator
+                    grid_img[screen_center_y, :] = [0, 255, 0]  # Green equator line
+
+                    # Make a copy of theta_deg for grid alignment
+                    # Shift all theta values so 0° is exactly at the center row of the screen
+                    center_theta = theta_deg[screen_center_y, width // 2]
+                    adjusted_theta_deg = theta_deg - center_theta
+
+                    # Find the grid line positions in phi/theta space
+                    phi_grid_lines = np.arange(
+                        np.floor(np.min(phi_deg) / checker_size_x) * checker_size_x,
+                        np.ceil(np.max(phi_deg) / checker_size_x) * checker_size_x + 1,
+                        checker_size_x,
+                    )
+
+                    theta_grid_lines = np.arange(
+                        np.floor(np.min(adjusted_theta_deg) / checker_size_y)
+                        * checker_size_y,
+                        np.ceil(np.max(adjusted_theta_deg) / checker_size_y)
+                        * checker_size_y
+                        + 1,
+                        checker_size_y,
+                    )
+
+                    # Draw vertical grid lines (lines of constant phi)
+                    for phi_value in phi_grid_lines:
+                        phi_mask = np.abs(phi_deg - phi_value) < 0.3
+                        grid_img[phi_mask] = [255, 0, 0]  # Red color
+
+                    # Draw horizontal grid lines (lines of constant theta)
+                    for theta_value in theta_grid_lines:
+                        # Skip the equator line as we've already drawn it in green
+                        if abs(theta_value) < 0.5:
+                            continue
+
+                        theta_mask = np.abs(adjusted_theta_deg - theta_value) < 0.3
+                        grid_img[theta_mask] = [255, 0, 0]  # Red color
+
+                    # Draw bar outline using mask approach for consistent appearance
+                    if direction == "left-to-right":
+                        # Left and right edges of bar are lines of constant phi
+                        left_edge = bar_pos - bar_width / 2
+                        right_edge = bar_pos + bar_width / 2
+
+                        # Create masks for left and right edges
+                        left_mask = np.abs(phi_deg - left_edge) < 0.3
+                        right_mask = np.abs(phi_deg - right_edge) < 0.3
+
+                        # Apply masks to draw bar edges
+                        bar_img[left_mask] = [0, 0, 255]  # Blue color
+                        bar_img[right_mask] = [0, 0, 255]  # Blue color
+
+                    else:  # bottom-to-top
+                        # Bottom and top edges of bar are lines of constant theta
+                        bottom_edge = bar_pos - bar_width / 2
+                        top_edge = bar_pos + bar_width / 2
+
+                        # Create masks for bottom and top edges
+                        bottom_mask = np.abs(adjusted_theta_deg - bottom_edge) < 0.3
+                        top_mask = np.abs(adjusted_theta_deg - top_edge) < 0.3
+
+                        # Apply masks to draw bar edges
+                        bar_img[bottom_mask] = [0, 0, 255]  # Blue color
+                        bar_img[top_mask] = [0, 0, 255]  # Blue color
+
+                    # Apply dilation to make the bar outline slightly thicker
+                    bar_img = cv2.dilate(
+                        bar_img, np.ones((2, 2), np.uint8), iterations=1
+                    )
+
+                    # Combine the original frame with grids and bar outlines
+                    overlay = cv2.addWeighted(frame_rgb, 1.0, grid_img, 0.7, 0)
+                    overlay = cv2.addWeighted(overlay, 1.0, bar_img, 0.7, 0)
+
+                    # Use the overlay image for display
+                    display_image = overlay
+                    cmap = None  # Use RGB colors
+                else:
+                    # Use the original black and white frame
+                    display_image = frame
+                    cmap = "gray"  # Use grayscale colormap
+
+                # Create the subplot
+                ax = axs[row, col]
+
+                # Display the frame with correct extent matching the visual field
+                im = ax.imshow(display_image, extent=extent, aspect="auto", cmap=cmap)
+
+                # Force the correct aspect ratio on the axes to match the pixel aspect ratio
+                ax.set_box_aspect(1 / pixel_aspect_ratio)  # Make width > height
+
+                # Set axis limits to exactly match the visual field
+                ax.set_xlim(azimuth_min, azimuth_max)
+                ax.set_ylim(altitude_min, altitude_max)
+
+                # Set tick positions to match grid lines (25-degree intervals)
+                ax.set_xticks(azimuth_lines)
+                ax.set_yticks(altitude_lines)
+
+                # Format tick labels to be cleaner (no decimal places)
+                ax.set_xticklabels(
+                    [f"{int(x)}" if x == int(x) else f"{x:.1f}" for x in azimuth_lines]
+                )
+                ax.set_yticklabels(
+                    [f"{int(y)}" if y == int(y) else f"{y:.1f}" for y in altitude_lines]
+                )
+
+                # Reduce tick label size to prevent overlapping
+                ax.tick_params(axis="both", labelsize=8)
+
+                # Add title with angular position
+                if row == 0:  # Horizontal sweep
+                    angle = horizontal_angles[col]
+                    ax.set_title(f"Azimuth: {angle:.1f}°")
+                else:  # Vertical sweep
+                    angle = vertical_angles[col]
+                    ax.set_title(f"Altitude: {angle:.1f}°")
+
+                # Set axis labels
+                if col == 0:
+                    ax.set_ylabel("Altitude (°)")
+                if row == 1:
+                    ax.set_xlabel("Azimuth (°)")
+
+                # Draw the center point as reference
+                ax.plot(0, 0, "+", color="k", markersize=8)
+
+        # Add row titles
+        fig.text(0.02, 0.75, "Left to Right", fontsize=14, rotation=90)
+        fig.text(0.02, 0.25, "Bottom to Top", fontsize=14, rotation=90)
+
+        # Add a simple legend using rectangular patches
+        from matplotlib.patches import Patch
+
+        if use_overlays:
+            legend_elements = [
+                Patch(facecolor="red", alpha=0.7, label="25° Grid"),
+                Patch(facecolor="blue", alpha=0.7, label="20° Bar Width"),
+                Patch(facecolor="green", alpha=0.7, label="Equator (0°)"),
+            ]
+        else:
+            legend_elements = [
+                Patch(facecolor="gray", alpha=0.7, label="25° Checkerboard Pattern"),
+                Patch(facecolor="black", alpha=1.0, label="20° Bar Width"),
+            ]
+
+        axs[0, 0].legend(handles=legend_elements, loc="lower left", fontsize=8)
+
+        # Add a title explaining the visualization
+        plt.figtext(
+            0.5,
+            0.02,
+            "Drifting bar (9°/s) with 6Hz counterphase flickering checkerboard pattern (20° bar width, 25° grid)",
+            ha="center",
+            fontsize=12,
         )
-        spherical_correction.parameters["width"] = width
-        spherical_correction.parameters["height"] = height
 
-        # Create transformation maps for this direction
-        map_x, map_y = spherical_correction.create_transformation_maps(width, height)
+        # Adjust layout
+        plt.tight_layout(rect=(0.03, 0, 1, 0.95))  # Adjust for row titles
 
-        for col, progress in enumerate(progress_points):
-            # Calculate frame index from progress
-            frame_idx = int(progress * (stimulus.frame_count - 1))
+        return fig
 
-            # Generate the frame with properly transformed bar
-            frame = stimulus.get_frame(frame_idx)
+    # Create and save the black and white version (for paper)
+    bw_fig = create_figure(use_overlays=False)
+    bw_fig.savefig("test_output/comparison_grid_bw.png", dpi=150, bbox_inches="tight")
+    plt.close(bw_fig)
 
-            # Convert to RGB for drawing colored lines
-            # Make a copy to avoid modifying the original
-            frame_rgb = cv2.cvtColor(frame.copy(), cv2.COLOR_GRAY2RGB)
-
-            # Get current bar position
-            if direction == "left-to-right":
-                bar_pos = horizontal_angles[col]
-            else:
-                bar_pos = vertical_angles[col]
-
-            # Create separate images for grid and bar outline
-            grid_img = np.zeros((height, width, 3), dtype=np.uint8)
-            bar_img = np.zeros((height, width, 3), dtype=np.uint8)
-
-            # Create a full coordinate grid for the entire frame
-            y_coords, x_coords = np.mgrid[0:height, 0:width]
-            x_norm = x_coords / (width / 2) - 1.0
-            y_norm = y_coords / (height / 2) - 1.0
-
-            # Convert to visual degrees
-            x_deg = x_norm * (x_size / 2)
-            y_deg = y_norm * (y_size / 2)
-
-            # Transform to get spherical coordinates (phi and theta)
-            phi_deg, theta_deg = apply_exact_spherical_transform(x_deg, y_deg)
-
-            # Create the grid lines by matching the checkerboard pattern generation in DriftingBarStimulus
-            grid_img = np.zeros((height, width, 3), dtype=np.uint8)
-
-            # Calculate the visual center of the screen in spherical coordinates
-            # This line should be the equator (theta = 0)
-            screen_center_y = height // 2
-            equator_y_coords = np.ones(width, dtype=int) * screen_center_y
-            equator_x_coords = np.arange(width)
-
-            # Draw a horizontal line at the exact center of the screen as the equator
-            # Use green to highlight it
-            grid_img[screen_center_y, :] = [0, 255, 0]  # Green equator line
-
-            # Make a copy of theta_deg for grid alignment
-            # Shift all theta values so 0° is exactly at the center row of the screen
-            center_theta = theta_deg[
-                screen_center_y, width // 2
-            ]  # Value at center pixel
-            adjusted_theta_deg = theta_deg - center_theta
-
-            # Calculate the phi and theta grid lines based on the adjusted coordinates
-            # For a proper 25° grid, we want grid lines every 25 degrees
-
-            # Find the grid line positions in phi/theta space
-            phi_grid_lines = np.arange(
-                np.floor(np.min(phi_deg) / checker_size_x) * checker_size_x,
-                np.ceil(np.max(phi_deg) / checker_size_x) * checker_size_x + 1,
-                checker_size_x,
-            )
-
-            theta_grid_lines = np.arange(
-                np.floor(np.min(adjusted_theta_deg) / checker_size_y) * checker_size_y,
-                np.ceil(np.max(adjusted_theta_deg) / checker_size_y) * checker_size_y
-                + 1,
-                checker_size_y,
-            )
-
-            # Draw vertical grid lines (lines of constant phi)
-            for phi_value in phi_grid_lines:
-                phi_mask = np.abs(phi_deg - phi_value) < 0.3
-                grid_img[phi_mask] = [255, 0, 0]  # Red color
-
-            # Draw horizontal grid lines (lines of constant theta)
-            for theta_value in theta_grid_lines:
-                # Skip the equator line as we've already drawn it in green
-                if abs(theta_value) < 0.5:
-                    continue
-
-                theta_mask = np.abs(adjusted_theta_deg - theta_value) < 0.3
-                grid_img[theta_mask] = [255, 0, 0]  # Red color
-
-            # Draw bar outline using mask approach for consistent appearance
-            if direction == "left-to-right":
-                # Left and right edges of bar are lines of constant phi (azimuth)
-                left_edge = bar_pos - bar_width / 2
-                right_edge = bar_pos + bar_width / 2
-
-                # Create masks for left and right edges - use narrow mask for precise edges
-                left_mask = np.abs(phi_deg - left_edge) < 0.3
-                right_mask = np.abs(phi_deg - right_edge) < 0.3
-
-                # Apply masks to draw bar edges
-                bar_img[left_mask] = [0, 0, 255]  # Blue color
-                bar_img[right_mask] = [0, 0, 255]  # Blue color
-
-            else:  # bottom-to-top
-                # Bottom and top edges of bar are lines of constant theta (altitude)
-                # Use the adjusted theta that makes the equator straight
-                bottom_edge = bar_pos - bar_width / 2
-                top_edge = bar_pos + bar_width / 2
-
-                # Create masks for bottom and top edges - use adjusted theta for consistency
-                bottom_mask = np.abs(adjusted_theta_deg - bottom_edge) < 0.3
-                top_mask = np.abs(adjusted_theta_deg - top_edge) < 0.3
-
-                # Apply masks to draw bar edges
-                bar_img[bottom_mask] = [0, 0, 255]  # Blue color
-                bar_img[top_mask] = [0, 0, 255]  # Blue color
-
-            # Apply dilation to make the bar outline slightly thicker
-            bar_img = cv2.dilate(bar_img, np.ones((2, 2), np.uint8), iterations=1)
-
-            # Combine the original frame with grids and bar outlines
-            # Apply grid overlay - blend with some transparency
-            overlay = cv2.addWeighted(frame_rgb, 1.0, grid_img, 0.7, 0)
-
-            # Apply bar outline - blend with some transparency
-            overlay = cv2.addWeighted(overlay, 1.0, bar_img, 0.7, 0)
-
-            # Display the frame with correct extent matching the visual field
-            extent = (
-                float(azimuth_min),
-                float(azimuth_max),
-                float(altitude_min),
-                float(altitude_max),
-            )
-
-            # Create the subplot
-            ax = axs[row, col]
-
-            # Display the combined frame - use the video's pixel aspect ratio
-            # Use 'auto' aspect for the data, and we'll control the display aspect through the figure size
-            im = ax.imshow(overlay, extent=extent, aspect="auto")
-
-            # Force the correct aspect ratio on the axes to match the pixel aspect ratio
-            # This ensures the image appears with the correct 4:3 width to height ratio
-            ax.set_box_aspect(1 / pixel_aspect_ratio)  # Make width > height
-
-            # Set axis limits to exactly match the visual field
-            ax.set_xlim(azimuth_min, azimuth_max)
-            ax.set_ylim(altitude_min, altitude_max)
-
-            # Set tick positions to match grid lines (25-degree intervals)
-            ax.set_xticks(azimuth_lines)
-            ax.set_yticks(altitude_lines)
-
-            # Format tick labels to be cleaner (no decimal places)
-            ax.set_xticklabels(
-                [f"{int(x)}" if x == int(x) else f"{x:.1f}" for x in azimuth_lines]
-            )
-            ax.set_yticklabels(
-                [f"{int(y)}" if y == int(y) else f"{y:.1f}" for y in altitude_lines]
-            )
-
-            # Reduce tick label size to prevent overlapping
-            ax.tick_params(axis="both", labelsize=8)
-
-            # Add title with angular position
-            if row == 0:  # Horizontal sweep
-                angle = horizontal_angles[col]
-                ax.set_title(f"Azimuth: {angle:.1f}°")
-            else:  # Vertical sweep
-                angle = vertical_angles[col]
-                ax.set_title(f"Altitude: {angle:.1f}°")
-
-            # Set axis labels
-            if col == 0:
-                ax.set_ylabel("Altitude (°)")
-            if row == 1:
-                ax.set_xlabel("Azimuth (°)")
-
-            # Draw the center point as reference
-            ax.plot(0, 0, "+", color="k", markersize=8)
-
-    # Add row titles
-    fig.text(0.02, 0.75, "Left to Right", fontsize=14, rotation=90)
-    fig.text(0.02, 0.25, "Bottom to Top", fontsize=14, rotation=90)
-
-    # Add a simple legend using rectangular patches
-    from matplotlib.patches import Patch
-
-    legend_elements = [
-        Patch(facecolor="red", alpha=0.7, label="25° Grid"),
-        Patch(facecolor="blue", alpha=0.7, label="20° Bar Width"),
-    ]
-    axs[0, 0].legend(handles=legend_elements, loc="lower left", fontsize=8)
-
-    # Add a title explaining the visualization
-    plt.figtext(
-        0.5,
-        0.02,
-        "Drifting bar with spherical correction: 20° bar width, 25° checkerboard pattern",
-        ha="center",
-        fontsize=12,
+    # Create and save the debug version (with grid overlays)
+    debug_fig = create_figure(use_overlays=True)
+    debug_fig.savefig(
+        "test_output/comparison_grid_debug.png", dpi=150, bbox_inches="tight"
     )
-
-    # Adjust layout and save
-    plt.tight_layout(rect=(0.03, 0, 1, 0.95))  # Adjust for row titles
-    plt.savefig("test_output/comparison_grid.png", dpi=150, bbox_inches="tight")
-    plt.close()
+    plt.close(debug_fig)
 
     print("Comparison grid created successfully!")
+    print("Saved black and white version for paper (comparison_grid_bw.png)")
+    print("Saved debug version with grid overlays (comparison_grid_debug.png)")
 
 
 if __name__ == "__main__":

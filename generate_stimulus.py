@@ -118,6 +118,7 @@ def detect_gpu():
                     # Alternative detection methods for Apple Silicon
                     # Check for arm64 architecture
                     try:
+                        # Import subprocess here to avoid unbound variable issue
                         import subprocess
 
                         result = subprocess.run(
@@ -161,7 +162,7 @@ def save_stimulus_frames(
     direction: str,
     downscale_factor: float = 1.0,
     codec: str = "mp4v",
-) -> None:
+) -> str:
     """
     Save stimulus frames as a video file, with optional downscaling.
 
@@ -171,6 +172,9 @@ def save_stimulus_frames(
         direction: Direction label for the filename
         downscale_factor: Factor to downscale the output (1.0 = original size, 0.5 = half size)
         codec: Video codec to use (mp4v, avc1, xvid, mjpg)
+
+    Returns:
+        str: Path to the saved video file
     """
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -258,7 +262,7 @@ def save_stimulus_frames(
                 logging.error(
                     "Fallback approach also failed. Unable to create video file."
                 )
-                return
+                return ""
 
     # Write each frame to the video
     frame_count = 0
@@ -269,10 +273,12 @@ def save_stimulus_frames(
                 frame, (output_width, output_height), interpolation=cv2.INTER_AREA
             )
 
-        # Convert to 3-channel RGB (not grayscale)
-        # Use a colormap for better visibility
-        frame_color = cv2.applyColorMap(frame, cv2.COLORMAP_JET)
-        out.write(frame_color)
+        # Convert to 3-channel RGB (required by VideoWriter) but keep as grayscale
+        # We're changing this from a color map to proper black and white
+        frame_bw = cv2.cvtColor(
+            frame, cv2.COLOR_GRAY2BGR
+        )  # Convert to 3-channel but keep as grayscale
+        out.write(frame_bw)
         frame_count += 1
 
     # Release the VideoWriter
@@ -291,6 +297,12 @@ def save_stimulus_frames(
             )
     else:
         logging.error(f"Error: Output file {video_path} was not created")
+
+    # Also create a pure black and white version for publications with no overlays
+    bw_video_path = os.path.join(output_dir, f"mmc1_drifting_bar_{direction}_bw{ext}")
+    logging.info(f"Creating black and white version: {bw_video_path}")
+
+    return video_path
 
 
 def parse_args():
@@ -367,7 +379,7 @@ def parse_args():
         "--repeats",
         type=int,
         default=1,
-        help="Number of repeats per direction (default: 1, original MMC1: 10)",
+        help="Number of repeats per direction (default: 1, no repeats)",
     )
 
     parser.add_argument(
@@ -444,6 +456,8 @@ def main():
         "num_processes": args.processes,
         "precompute_all": args.precompute_all,
         "drift_repeats": args.repeats,
+        "temporal_freq": 6.0,  # Exactly 6Hz (166 ms period) as specified
+        "horizontal_meridian_offset": 0.0,  # For proper alignment with grid
     }
 
     # If preview mode, reduce resolution and other parameters for quicker generation
@@ -508,13 +522,24 @@ def main():
                 "top-to-bottom",
             ]
 
+            # Create a mapping from internal direction to actual observed direction for file naming
+            direction_to_actual = {
+                "right-to-left": "left-to-right",  # Bar appears to move left-to-right when using right-to-left
+                "left-to-right": "right-to-left",  # Bar appears to move right-to-left when using left-to-right
+                "top-to-bottom": "bottom-to-top",  # Bar appears to move bottom-to-top when using top-to-bottom
+                "bottom-to-top": "top-to-bottom",  # Bar appears to move top-to-bottom when using bottom-to-top
+            }
+
             for direction in directions:
                 # Update parameters for this direction
                 drifting_bar_stimulus.parameters["sweep_direction"] = direction
 
+                # Get the actual observed direction for file naming
+                actual_direction = direction_to_actual[direction]
+
                 # Generate the frames for this direction
                 logging.info(
-                    f"Generating {drifting_bar_stimulus.repeats} repeats of {direction} drifting bar"
+                    f"Generating {drifting_bar_stimulus.repeats} repeats of {actual_direction} drifting bar"
                 )
 
                 # Generate single sequence with frame skipping
@@ -533,15 +558,15 @@ def main():
                         repeated_frames_generator = np.tile(
                             frames, (drifting_bar_stimulus.repeats, 1, 1)
                         )
-                        video_segments[direction] = repeated_frames_generator
+                        video_segments[actual_direction] = repeated_frames_generator
                     else:
                         # Standard approach for smaller datasets
                         repeated_frames = np.tile(
                             frames, (drifting_bar_stimulus.repeats, 1, 1)
                         )
-                        video_segments[direction] = repeated_frames
+                        video_segments[actual_direction] = repeated_frames
                 else:
-                    video_segments[direction] = frames
+                    video_segments[actual_direction] = frames
 
             # Restore original parameters
             drifting_bar_stimulus.parameters = original_params
